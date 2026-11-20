@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taos Personal Hub | Apps & Utilidades</title>
+  <meta name="description" content="Portal centralizado de aplicaciones y proyectos personales de Jose Manuel (Taos).">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Gradient animated glowing effects */
+    .glow-card {
+      position: relative;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glow-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 20px 35px -10px rgba(99, 102, 241, 0.15);
+    }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.025em;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
+
+  <!-- Background decorative light gradients -->
+  <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-tr from-indigo-600/20 via-purple-600/15 to-emerald-500/10 blur-[130px] rounded-full"></div>
+    <div class="absolute bottom-10 right-0 w-[500px] h-[400px] bg-indigo-900/10 blur-[150px] rounded-full"></div>
+    <div class="absolute top-1/2 left-0 w-[400px] h-[400px] bg-blue-900/10 blur-[140px] rounded-full"></div>
+  </div>
+
+  <!-- Humorous Disclaimer Top Banner -->
+  <div class="bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 border-b border-amber-500/20 px-4 py-3 text-center text-sm text-amber-200">
+    <div class="max-w-4xl mx-auto flex items-center justify-center gap-2">
+      <span class="text-lg">⚠️</span>
+      <p>
+        <span class="font-bold text-amber-300">Aviso a navegantes:</span> 
+        Esta es la guarida de utilidades y proyectos personales de <strong>Jose Manuel (Taos)</strong>. 
+        Si has llegado aquí por casualidad y no eres de la familia o amistades... ¡probablemente solo encuentres cosas sumamente aburridas para ti!
+      </p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="max-w-6xl w-full mx-auto px-6 pt-12 pb-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-[2px] shadow-lg shadow-indigo-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-2xl font-black text-indigo-400 font-mono">
+            T
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-3">
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white">Taos Personal Hub</h1>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Monorepo</span>
+          </div>
+          <p class="text-slate-400 text-sm mt-0.5">Acceso directo a utilidades, guías familiares, eventos y herramientas privadas.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 text-xs text-slate-400">
+        <a href="https://github.com/JoseMHR" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+          <i data-lucide="github" class="w-4 h-4"></i>
+          <span>GitHub @JoseMHR</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="flex items-center gap-2 mt-6 overflow-x-auto pb-2 scrollbar-none" id="filter-container">
+      <button onclick="filterProjects('all')" class="filter-btn active px-3.5 py-1.5 rounded-xl text-xs font-medium bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 transition">
+        Todos (5)
+      </button>
+      <button onclick="filterProjects('eventos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        Eventos
+      </button>
+      <button onclick="filterProjects('viajes')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        Viajes
+      </button>
+      <button onclick="filterProjects('salud')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        Herramientas
+      </button>
+      <button onclick="filterProjects('juegos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+        Juegos
+      </button>
+    </div>
+  </header>
+
+  <!-- Projects Grid -->
+  <main class="max-w-6xl w-full mx-auto px-6 py-6 flex-1">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="projects-grid">
+
+      <!-- 1. Boda Elena & José -->
+      <a href="./boda/" data-category="eventos" 
+         class="project-card glow-card rounded-2xl p-6 flex flex-col justify-between group">
+        <div>
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 group-hover:scale-110 transition duration-300">
+              <i data-lucide="heart-handshake" class="w-6 h-6"></i>
+            </div>
+            <span class="badge px-2.5 py-1 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/20">
+              Evento 2026
+            </span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white group-hover:text-pink-300 transition duration-200">
+            Boda Elena & José
+          </h3>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            Página web interactiva del enlace: cronograma de la ceremonia, cuenta atrás, mapa del convite e imágenes oficiales.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-mono text-slate-400">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i> /boda/
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-pink-400 group-hover:translate-x-1 transition duration-200">
+            Abrir web <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </div>
+      </a>
+
+      <!-- 2. Violeta FisioPlanner -->
+      <a href="./fisioplanner/" data-category="salud" 
+         class="project-card glow-card rounded-2xl p-6 flex flex-col justify-between group">
+        <div>
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition duration-300">
+              <i data-lucide="calendar-check-2" class="w-6 h-6"></i>
+            </div>
+            <span class="badge px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+              Productividad
+            </span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white group-hover:text-emerald-300 transition duration-200">
+            Violeta FisioPlanner
+          </h3>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            Gestor interactivo de cuadrantes y turnos de fisioterapia para el centro Atenpace, con importador de Excel integrado.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-mono text-slate-400">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i> /fisioplanner/
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-emerald-400 group-hover:translate-x-1 transition duration-200">
+            Lanzar app <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </div>
+      </a>
+
+      <!-- 3. Juegos Reunidos Puzzles -->
+      <a href="./juegos-puzzles/" data-category="juegos" 
+         class="project-card glow-card rounded-2xl p-6 flex flex-col justify-between group">
+        <div>
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition duration-300">
+              <i data-lucide="gamepad-2" class="w-6 h-6"></i>
+            </div>
+            <span class="badge px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              Retro Game
+            </span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white group-hover:text-amber-300 transition duration-200">
+            Juegos & Puzzles de Tati
+          </h3>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            Suite arcade de rompecabezas táctiles retro adaptados a pantalla completa para móvil y tableta.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-mono text-slate-400">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i> /juegos-puzzles/
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-amber-400 group-hover:translate-x-1 transition duration-200">
+            Jugar ahora <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </div>
+      </a>
+
+      <!-- 4. Viaje Familiar Alsacia -->
+      <a href="./viaje-alsacia/" data-category="viajes" 
+         class="project-card glow-card rounded-2xl p-6 flex flex-col justify-between group">
+        <div>
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition duration-300">
+              <i data-lucide="plane" class="w-6 h-6"></i>
+            </div>
+            <span class="badge px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+              Guía Familiar
+            </span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white group-hover:text-cyan-300 transition duration-200">
+            Misión: Alsacia
+          </h3>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            Planificador integral de ruta por la Alsacia francesa: mapas con Leaflet, paradas destacadas y consejos de viaje.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-mono text-slate-400">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i> /viaje-alsacia/
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-cyan-400 group-hover:translate-x-1 transition duration-200">
+            Ver guía <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </div>
+      </a>
+
+      <!-- 5. Viaje Madrid Oscar & Elena -->
+      <a href="./viaje-madrid/" data-category="viajes" 
+         class="project-card glow-card rounded-2xl p-6 flex flex-col justify-between group">
+        <div>
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 group-hover:scale-110 transition duration-300">
+              <i data-lucide="map-pin" class="w-6 h-6"></i>
+            </div>
+            <span class="badge px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20">
+              Ruta Madrid
+            </span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white group-hover:text-violet-300 transition duration-200">
+            Planning Visita Madrid 2026
+          </h3>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            Itinerario y cronograma por días para la visita de Oscar y Elena a Madrid: museos, gastronomía y horarios clave.
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-mono text-slate-400">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-slate-500"></i> /viaje-madrid/
+          </span>
+          <span class="inline-flex items-center gap-1 font-semibold text-violet-400 group-hover:translate-x-1 transition duration-200">
+            Ver ruta <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </div>
+      </a>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <p>© <span id="current-year">2026</span> Jose Manuel Heredia (Taos). Hecho con fines personales y familiares.</p>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/JoseMHR/TaosPersonal" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition">Repositorio</a>
+        <span>•</span>
+        <a href="./boda/" class="hover:text-slate-300 transition">Boda</a>
+        <span>•</span>
+        <a href="./fisioplanner/" class="hover:text-slate-300 transition">FisioPlanner</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Dynamic Year
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // Category Filtering
+    function filterProjects(category) {
+      const cards = document.querySelectorAll('.project-card');
+      const buttons = document.querySelectorAll('.filter-btn');
+
+      buttons.forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-indigo-600/30');
+        btn.classList.add('bg-slate-900', 'border', 'border-slate-800', 'text-slate-300');
+      });
+
+      // Highlight active button
+      event.target.classList.remove('bg-slate-900', 'border', 'border-slate-800', 'text-slate-300');
+      event.target.classList.add('bg-indigo-600', 'text-white', 'shadow-indigo-600/30');
+
+      cards.forEach(card => {
+        if (category === 'all' || card.dataset.category === category) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

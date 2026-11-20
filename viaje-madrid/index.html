@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es" class="bg-slate-50 min-h-screen">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Planning Visita Oscar y Elena ✈️ Madrid</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Prevent rubber-band effect & smooth interactions */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .touch-press {
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .touch-press:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 antialiased select-none pb-24">
+
+  <!-- Unified Sticky Top Bar: keeps both the title and the week plans row permanently fixed on scroll -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-2xl mx-auto px-3.5 py-2.5 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-xs flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-extrabold text-slate-900 leading-tight">Visita Oscar y Elena ✈️</h1>
+          <p class="text-[11px] font-semibold text-slate-500">Mar 5 · Dom 11 Oct</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-2">
+        <button onclick="openModal('add')" class="touch-press h-8 sm:h-9 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center space-x-1 text-xs font-bold">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>+ Nueva Idea</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pinned Week Plans Bar: stays visible at all times while scrolling through ideas -->
+    <div class="border-t border-slate-100 px-2 sm:px-3 py-2 bg-white">
+      <div class="max-w-2xl mx-auto">
+        <div id="tabsContainer" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 px-0.5 sm:grid sm:grid-cols-5 snap-x">
+          <!-- Rendered dynamically with day labels and full plan previews -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-2xl w-full mx-auto p-4">
+    <!-- Context Banner for current view -->
+    <div id="viewBanner" class="mb-4 bg-indigo-50 border border-indigo-100 rounded-2xl p-3 flex items-center justify-between text-indigo-950">
+      <!-- Dynamic banner text -->
+    </div>
+
+    <!-- Cards container -->
+    <div id="cardsList" class="space-y-3">
+      <!-- Populated via JavaScript -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12 px-4">
+      <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-3">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+      </div>
+      <p class="text-sm font-semibold text-slate-700">No hay planes en este día</p>
+      <p class="text-xs text-slate-500 mt-1">Asigna planes desde el banco de Ideas o crea uno nuevo.</p>
+      <button onclick="changeTab('pool')" class="mt-4 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold">
+        Explorar Ideas Disponibles
+      </button>
+    </div>
+  </main>
+
+  <div id="moveModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden transition-opacity flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl transform transition-transform">
+      <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-[11px] font-bold tracking-wider uppercase text-indigo-600">Reorganizar Plan</span>
+          <h3 id="movePlanTitle" class="text-base font-bold text-slate-900 line-clamp-1">Plan Name</h3>
+        </div>
+        <button onclick="closeModal('move')" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">¿Para qué día quieres programar esta actividad?</p>
+      
+      <!-- Day options list -->
+      <div class="grid grid-cols-1 gap-2" id="moveOptionsContainer">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <div id="planFormModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="formModalTitle" class="text-base font-bold text-slate-900">Añadir Nueva Idea</h3>
+        <button onclick="closeModal('add')" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="planForm" onsubmit="handleSavePlan(event)" class="space-y-3.5 text-xs">
+        <input type="hidden" id="editPlanId" value="">
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nombre del Plan o Lugar *</label>
+          <input type="text" id="planTitleInput" required placeholder="Ej: Excursión a El Escorial..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Asignar a:</label>
+          <select id="planDayInput" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white">
+            <option value="pool">💡 Banco de Ideas (Pendiente)</option>
+            <option value="wed">Miércoles 6 Oct</option>
+            <option value="thu">Jueves 7 Oct</option>
+            <option value="fri">Viernes 8 Oct</option>
+            <option value="sat">Sábado 9 Oct</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-semibold text-slate-700">Comida / Restaurante / Nota Gastro</label>
+            <div class="flex gap-1">
+              <button type="button" onclick="setFoodShortcut('🍣 Sushi antes de ir')" class="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] rounded border border-amber-200">🍣 Sushi antes</button>
+              <button type="button" onclick="setFoodShortcut('🍣 Sushi después de ir')" class="px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] rounded border border-amber-200">🍣 Sushi despu.</button>
+            </div>
+          </div>
+          <input type="text" id="planFoodInput" placeholder="Ej: Sushi antes de ir, Wok en la cima, etc." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Detalles o descripción (opcional)</label>
+          <textarea id="planDescInput" rows="2" placeholder="Consejos, qué ver, horarios..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="planCarInput" class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+          <label for="planCarInput" class="text-slate-700 font-medium cursor-pointer">🚗 Requiere coche / Es en coche</label>
+        </div>
+
+        <div class="pt-3 flex space-x-2">
+          <button type="button" onclick="closeModal('add')" class="flex-1 py-2.5 border border-slate-300 rounded-xl text-slate-700 font-semibold hover:bg-slate-50">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold shadow hover:bg-indigo-700">Guardar Plan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2 opacity-0 pointer-events-none transition-all duration-200">
+    <span id="toastIcon">✨</span>
+    <span id="toastMsg">Acción completada</span>
+  </div>
+
+  <script>
+    // Day definitions (Agenda removed; focused on 4 visit days + pool)
+    const DAYS = {
+      pool: { id: 'pool', label: '💡 Ideas', fullLabel: 'Todas las ideas', subtitle: 'Banco de planes disponibles' },
+      wed:  { id: 'wed',  label: 'Mié 6',   fullLabel: 'Miércoles 6 Oct',  subtitle: 'Primer día de ruta juntos' },
+      thu:  { id: 'thu',  label: 'Jue 7',   fullLabel: 'Jueves 7 Oct',     subtitle: 'Día libre para elegir' },
+      fri:  { id: 'fri',  label: 'Vie 8',   fullLabel: 'Viernes 8 Oct',    subtitle: 'Comienzo del fin de semana' },
+      sat:  { id: 'sat',  label: 'Sáb 9',   fullLabel: 'Sábado 9 Oct',     subtitle: 'Día grande de la visita' }
+    };
+
+    // Predefined items as requested
+    const DEFAULT_PLANS = [
+      {
+        id: 'plan_1',
+        title: 'Feria medieval de Alcalá de Henares',
+        day: 'sat', // Predefinida sábado
+        food: 'Pan pita con cochinillo asado delante tuya 🍖',
+        car: false,
+        desc: 'Ambiente histórico cervantino, puestos de artesanía, puestos de asado y espectáculos.'
+      },
+      {
+        id: 'plan_2',
+        title: 'Capital 1: Sol, Calle Luna, Gran Vía, Parque Retiro, Prado',
+        day: 'wed', // Predefinida miércoles
+        food: 'Bocadillo de calamares o tapeo por el centro 🥪',
+        car: false,
+        desc: 'Recorrido clásico por el corazón de Madrid, paseo arbolado por El Retiro y exteriores del Museo del Prado.'
+      },
+      {
+        id: 'plan_3',
+        title: 'Capital 2: Templo de Debod y Palacio de la Moncloa',
+        day: 'pool',
+        food: '',
+        car: false,
+        desc: 'Atardecer en el templo egipcio de Debod con vistas a la Casa de Campo y zona Moncloa.'
+      },
+      {
+        id: 'plan_4',
+        title: 'Toledo histórico',
+        day: 'pool',
+        food: 'Wok en la cima para comer 🥢',
+        car: true,
+        desc: 'Excursión en coche. Callejuelas medievales, mirador del Valle y Wok buffet con vistas.'
+      },
+      {
+        id: 'plan_5',
+        title: 'Palacio Real de Aranjuez',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: true,
+        desc: 'Paseo por los majestuosos Jardines de la Isla y del Príncipe.'
+      },
+      {
+        id: 'plan_6',
+        title: 'Parque Europa (Torrejón)',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: false,
+        desc: 'Parque temático con réplicas exactas de monumentos famosos: Torre Eiffel, London Bridge, Fontana de Trevi.'
+      },
+      {
+        id: 'plan_7',
+        title: 'Parque Juan Carlos I',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: false,
+        desc: 'Parque gigantesco, ideal para caminar o alquilar bicis y desconectar.'
+      },
+      {
+        id: 'plan_8',
+        title: 'Parque de El Capricho',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: false,
+        desc: 'Jardín histórico romántico con laberinto, palacete y flores hermosas (más recogido y tranquilo).'
+      },
+      {
+        id: 'plan_9',
+        title: 'Centro Comercial X-Madrid (Alcorcón)',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: false,
+        desc: 'Centro comercial alternativo con planta friki arriba: tienda oficial de Harry Potter, zonas gaming y ocio.'
+      },
+      {
+        id: 'plan_10',
+        title: 'Parque de Atracciones de Madrid',
+        day: 'pool',
+        food: 'Comida en el parque 🍔',
+        car: false,
+        desc: 'Adrenalina en la Casa de Campo, montañas rusas y espectáculos.'
+      },
+      {
+        id: 'plan_11',
+        title: 'Balneario Termas de Griñón',
+        day: 'pool',
+        food: 'Sushi después de ir allí 🍣',
+        car: true,
+        desc: 'Circuito termal gigante, hidromasaje y sesión de relax total.'
+      },
+      {
+        id: 'plan_12',
+        title: 'Palacio de Hielo (Pista de Patinaje)',
+        day: 'pool',
+        food: 'Sushi antes de ir allí 🍣',
+        car: false,
+        desc: 'Pista de patinaje sobre hielo cubierta y centro comercial.'
+      }
+    ];
+
+    // Local storage state management
+    let plans = [];
+    let currentTab = 'pool';
+    let targetPlanForMove = null;
+
+    function initData() {
+      try {
+        const stored = localStorage.getItem('hermano_madrid_planning_v1');
+        if (stored) {
+          plans = JSON.parse(stored);
+        } else {
+          plans = [...DEFAULT_PLANS];
+          saveData();
+        }
+      } catch (e) {
+        plans = [...DEFAULT_PLANS];
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem('hermano_madrid_planning_v1', JSON.stringify(plans));
+      } catch (e) {
+        console.error('Error saving data', e);
+      }
+    }
+
+    function showToast(msg, icon = '✅') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = icon;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2300);
+    }
+
+    // Helper: get full title & emoji for thumbnail preview
+    function getPlanThumbnail(plan) {
+      if (!plan) return { text: 'Libre', isFree: true, icon: '⚪' };
+      let icon = '📌';
+      if (plan.car) icon = '🚗';
+      if (plan.title.toLowerCase().includes('alcalá') || plan.title.toLowerCase().includes('feria')) icon = '🎪';
+      if (plan.title.toLowerCase().includes('sol') || plan.title.toLowerCase().includes('capital') || plan.title.toLowerCase().includes('templo') || plan.title.toLowerCase().includes('gran vía')) icon = '🏛️';
+      if (plan.title.toLowerCase().includes('parque') || plan.title.toLowerCase().includes('capricho') || plan.title.toLowerCase().includes('retiro')) icon = '🌳';
+      if (plan.title.toLowerCase().includes('toledo')) icon = '🏰';
+      if (plan.title.toLowerCase().includes('palacio')) icon = '👑';
+      if (plan.title.toLowerCase().includes('sushi') || (plan.food && plan.food.toLowerCase().includes('sushi'))) icon = '🍣';
+      if (plan.title.toLowerCase().includes('griñón') || plan.title.toLowerCase().includes('balneario')) icon = '🧖‍♂️';
+      if (plan.title.toLowerCase().includes('hielo')) icon = '⛸️';
+      if (plan.title.toLowerCase().includes('madrid x') || plan.title.toLowerCase().includes('x-madrid')) icon = '🛍️';
+
+      // Clean technical prefix only, keeping the full title visible
+      let cleanName = plan.title.replace(/^Capital \d+:\s*/i, '').trim();
+
+      return {
+        text: cleanName,
+        isFree: false,
+        icon: icon
+      };
+    }
+
+    function renderTabs() {
+      const container = document.getElementById('tabsContainer');
+      container.innerHTML = '';
+
+      const dayKeys = ['pool', 'wed', 'thu', 'fri', 'sat'];
+
+      dayKeys.forEach(key => {
+        const d = DAYS[key];
+        const isActive = currentTab === key;
+        const dayPlans = plans.filter(p => p.day === key);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.onclick = () => changeTab(key);
+        button.className = `touch-press flex flex-col justify-start items-center text-center p-2.5 sm:p-3 min-h-[96px] sm:min-h-[105px] rounded-2xl transition-all border min-w-[136px] sm:min-w-0 flex-1 snap-start ${
+          isActive 
+            ? 'bg-indigo-600 text-white border-indigo-700 shadow-md ring-2 ring-indigo-300' 
+            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs'
+        }`;
+
+        if (key === 'pool') {
+          button.innerHTML = `
+            <span class="text-xs sm:text-sm font-black tracking-tight w-full ${isActive ? 'text-white' : 'text-slate-800'}">Todas</span>
+            <div class="mt-2 w-full flex-1 min-h-[50px] py-2 px-2 rounded-xl text-xs font-black flex items-center justify-center text-center leading-tight gap-1 break-words whitespace-normal shadow-2xs ${
+              isActive ? 'bg-indigo-700/90 text-indigo-50 border border-indigo-500' : 'bg-amber-100 text-amber-950 border border-amber-300'
+            }">
+              💡 ${dayPlans.length} ideas
+            </div>
+          `;
+        } else {
+          const thumb = dayPlans.length > 0 ? getPlanThumbnail(dayPlans[0]) : getPlanThumbnail(null);
+
+          button.innerHTML = `
+            <span class="text-xs sm:text-sm font-black tracking-tight w-full ${isActive ? 'text-white' : 'text-slate-800'}">${d.label}</span>
+            <div class="mt-2 w-full flex-1 min-h-[50px] py-2 px-2 rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center text-center leading-snug gap-1.5 break-words whitespace-normal shadow-2xs ${
+              thumb.isFree 
+                ? (isActive ? 'bg-indigo-800/60 text-indigo-200 border border-dashed border-indigo-400 font-semibold' : 'bg-slate-100 text-slate-500 border border-dashed border-slate-300 font-semibold italic')
+                : (isActive ? 'bg-white text-indigo-950 shadow-sm font-black' : 'bg-indigo-50 text-indigo-950 border border-indigo-200 font-black')
+            }">
+              <span class="text-sm shrink-0">${thumb.icon}</span>
+              <span class="break-words leading-tight">${escapeHtml(thumb.text)}</span>
+            </div>
+          `;
+        }
+
+        container.appendChild(button);
+      });
+    }
+
+    function changeTab(key) {
+      currentTab = key;
+      renderTabs();
+      renderContent();
+    }
+
+    // Quick direct assignment helper with 1-plan-per-day enforcement
+    function quickAssignPlan(planId, targetDay) {
+      const p = plans.find(item => item.id === planId);
+      if (!p) return;
+
+      let replacedPlan = null;
+      // If assigning to a specific day, move any existing plan in that day back to pool
+      if (targetDay !== 'pool') {
+        const existing = plans.find(item => item.day === targetDay && item.id !== planId);
+        if (existing) {
+          existing.day = 'pool';
+          replacedPlan = existing;
+        }
+      }
+
+      p.day = targetDay;
+      saveData();
+      renderTabs();
+      renderContent();
+
+      const targetLabel = targetDay === 'pool' ? '💡 Ideas' : DAYS[targetDay].label;
+      if (replacedPlan) {
+        showToast(`Asignado a ${targetLabel} (sustituye el anterior)`);
+      } else {
+        showToast(`Asignado a ${targetLabel}`);
+      }
+    }
+
+    function renderContent() {
+      const banner = document.getElementById('viewBanner');
+      const cardsList = document.getElementById('cardsList');
+      const emptyState = document.getElementById('emptyState');
+
+      const dInfo = DAYS[currentTab];
+      
+      // Update banner info
+      banner.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">${dInfo.fullLabel}</h2>
+            <p class="text-xs text-slate-600">${dInfo.subtitle}</p>
+          </div>
+        </div>
+        <button onclick="openModal('add')" class="text-xs font-bold text-indigo-600 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 shadow-2xs hover:bg-indigo-50">
+          + Nueva Idea
+        </button>
+      `;
+
+      cardsList.innerHTML = '';
+      emptyState.classList.add('hidden');
+      cardsList.classList.remove('hidden');
+
+      if (currentTab === 'pool') {
+        // Show all pool ideas
+        const poolPlans = plans.filter(p => p.day === 'pool');
+        const assignedPlans = plans.filter(p => p.day !== 'pool');
+
+        if (poolPlans.length === 0 && assignedPlans.length === 0) {
+          emptyState.classList.remove('hidden');
+          cardsList.classList.add('hidden');
+          return;
+        }
+
+        // Section header for pool
+        const poolHeader = document.createElement('div');
+        poolHeader.className = "text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between";
+        poolHeader.innerHTML = `<span>Ideas pendientes por asignar (${poolPlans.length})</span>`;
+        cardsList.appendChild(poolHeader);
+
+        poolPlans.forEach(plan => {
+          cardsList.appendChild(createInteractivePlanCard(plan));
+        });
+
+        if (assignedPlans.length > 0) {
+          const assignedHeader = document.createElement('div');
+          assignedHeader.className = "text-xs font-bold text-slate-400 uppercase tracking-wider mt-6 mb-1 pt-3 border-t border-slate-200";
+          assignedHeader.textContent = `Planes ya agendados en días (${assignedPlans.length})`;
+          cardsList.appendChild(assignedHeader);
+
+          assignedPlans.forEach(plan => {
+            cardsList.appendChild(createInteractivePlanCard(plan));
+          });
+        }
+      } else {
+        // Specific day view
+        const dayPlans = plans.filter(p => p.day === currentTab);
+
+        if (dayPlans.length === 0) {
+          const freeDayBox = document.createElement('div');
+          freeDayBox.className = "p-5 bg-white border-2 border-dashed border-indigo-200 rounded-2xl text-center mb-5";
+          freeDayBox.innerHTML = `
+            <div class="text-3xl mb-1.5">🏖️</div>
+            <p class="text-base font-bold text-slate-800">${dInfo.fullLabel} está Libre</p>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">Pulsa en cualquiera de las ideas de abajo para asignarla directamente a este día con un toque:</p>
+          `;
+          cardsList.appendChild(freeDayBox);
+        } else {
+          const currentHeader = document.createElement('div');
+          currentHeader.className = "text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center space-x-1";
+          currentHeader.innerHTML = `<span>⭐ Plan agendado para ${dInfo.label}:</span>`;
+          cardsList.appendChild(currentHeader);
+
+          dayPlans.forEach(plan => {
+            cardsList.appendChild(createInteractivePlanCard(plan));
+          });
+        }
+
+        // Below day plans: Available ideas ready to be added on top with 1 tap
+        const poolPlans = plans.filter(p => p.day === 'pool');
+        if (poolPlans.length > 0) {
+          const addIdeasSection = document.createElement('div');
+          addIdeasSection.className = "mt-6 pt-4 border-t border-slate-200";
+          addIdeasSection.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                <span>💡 Ideas disponibles para añadir a ${dInfo.label}</span>
+                <span class="px-2 py-0.5 bg-amber-100 text-amber-900 text-[11px] font-bold rounded-full">${poolPlans.length}</span>
+              </h3>
+            </div>
+          `;
+          cardsList.appendChild(addIdeasSection);
+
+          poolPlans.forEach(plan => {
+            cardsList.appendChild(createInteractivePlanCard(plan, currentTab));
+          });
+        }
+      }
+    }
+
+    function createInteractivePlanCard(plan, highlightAssignDay = null) {
+      const card = document.createElement('div');
+      card.className = "bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm relative transition-all";
+
+      const isAssigned = plan.day !== 'pool';
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-bold ${
+                isAssigned ? 'bg-indigo-100 text-indigo-900 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+              }">
+                ${isAssigned ? '📅 ' + DAYS[plan.day].fullLabel : '💡 Sin asignar (Libre)'}
+              </span>
+              ${plan.car ? `
+                <span class="inline-flex items-center px-2 py-1 bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold rounded-lg">
+                  🚗 Coche
+                </span>
+              ` : ''}
+            </div>
+            <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug">${escapeHtml(plan.title)}</h3>
+          </div>
+          
+          <button onclick="editPlan('${plan.id}')" title="Editar plan" class="touch-press p-2 text-slate-400 hover:text-indigo-600 rounded-xl bg-slate-50 hover:bg-indigo-50 flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+          </button>
+        </div>
+
+        ${plan.food ? `
+          <div class="mt-3 flex items-center space-x-2 p-2.5 sm:p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-950 text-xs sm:text-sm font-semibold">
+            <span class="text-base sm:text-lg">🍽️</span>
+            <span class="flex-1">${escapeHtml(plan.food)}</span>
+          </div>
+        ` : ''}
+
+        ${plan.desc ? `
+          <p class="mt-2.5 text-xs sm:text-sm text-slate-600 leading-relaxed">${escapeHtml(plan.desc)}</p>
+        ` : ''}
+
+        <!-- Quick 1-tap allocation bar with taller, more prominent buttons -->
+        <div class="mt-4 pt-3 border-t border-slate-100">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Asignar a día:</span>
+            <button onclick="deletePlan('${plan.id}')" class="text-xs font-semibold text-rose-500 hover:text-rose-700 py-1 px-2">Eliminar</button>
+          </div>
+          <div class="grid grid-cols-4 gap-1.5 sm:gap-2">
+            <button onclick="quickAssignPlan('${plan.id}', 'wed')" class="touch-press h-11 sm:h-12 flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold border transition-all ${
+              plan.day === 'wed' 
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-300' 
+                : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+            }">Mié 6</button>
+            <button onclick="quickAssignPlan('${plan.id}', 'thu')" class="touch-press h-11 sm:h-12 flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold border transition-all ${
+              plan.day === 'thu' 
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-300' 
+                : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+            }">Jue 7</button>
+            <button onclick="quickAssignPlan('${plan.id}', 'fri')" class="touch-press h-11 sm:h-12 flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold border transition-all ${
+              plan.day === 'fri' 
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-300' 
+                : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+            }">Vie 8</button>
+            <button onclick="quickAssignPlan('${plan.id}', 'sat')" class="touch-press h-11 sm:h-12 flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold border transition-all ${
+              plan.day === 'sat' 
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-300' 
+                : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+            }">Sáb 9</button>
+          </div>
+          ${plan.day !== 'pool' ? `
+            <div class="mt-2.5 flex justify-end">
+              <button onclick="quickAssignPlan('${plan.id}', 'pool')" class="touch-press h-10 px-3.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 flex items-center space-x-1">
+                <span>↩ Mover a Ideas (Desasignar)</span>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      return card;
+    }
+
+    function promptMovePlan(planId) {
+      targetPlanForMove = plans.find(p => p.id === planId);
+      if (!targetPlanForMove) return;
+
+      document.getElementById('movePlanTitle').textContent = targetPlanForMove.title;
+      const container = document.getElementById('moveOptionsContainer');
+      container.innerHTML = '';
+
+      const dayKeys = ['pool', 'wed', 'thu', 'fri', 'sat'];
+      
+      dayKeys.forEach(k => {
+        const d = DAYS[k];
+        const isCurrent = targetPlanForMove.day === k;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.onclick = () => executeMove(k);
+        btn.className = `w-full text-left p-3 rounded-xl border flex items-center justify-between touch-press ${
+          isCurrent 
+            ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-bold' 
+            : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
+        }`;
+
+        btn.innerHTML = `
+          <div class="flex items-center space-x-2.5">
+            <span class="text-base">${k === 'pool' ? '💡' : '📅'}</span>
+            <div>
+              <p class="text-xs font-bold">${d.fullLabel}</p>
+              <p class="text-[10px] text-slate-500">${d.subtitle}</p>
+            </div>
+          </div>
+          ${isCurrent ? '<span class="text-indigo-600 text-xs font-semibold">Actual</span>' : '<span class="text-slate-400 text-xs">Mover aquí →</span>'}
+        `;
+        container.appendChild(btn);
+      });
+
+      document.getElementById('moveModal').classList.remove('hidden');
+    }
+
+    function executeMove(newDayKey) {
+      if (!targetPlanForMove) return;
+
+      // Replace existing plan if moving to a specific day
+      if (newDayKey !== 'pool') {
+        const existing = plans.find(item => item.day === newDayKey && item.id !== targetPlanForMove.id);
+        if (existing) {
+          existing.day = 'pool';
+        }
+      }
+
+      targetPlanForMove.day = newDayKey;
+      saveData();
+      closeModal('move');
+      renderTabs();
+      renderContent();
+      showToast(`Movido a ${DAYS[newDayKey].label}`);
+    }
+
+    function openModal(type) {
+      if (type === 'add') {
+        document.getElementById('editPlanId').value = '';
+        document.getElementById('formModalTitle').textContent = 'Nueva Idea o Actividad';
+        document.getElementById('planForm').reset();
+        document.getElementById('planDayInput').value = currentTab === 'all' ? 'pool' : currentTab;
+        document.getElementById('planFormModal').classList.remove('hidden');
+      }
+    }
+
+    function closeModal(type) {
+      if (type === 'move') {
+        document.getElementById('moveModal').classList.add('hidden');
+        targetPlanForMove = null;
+      } else if (type === 'add') {
+        document.getElementById('planFormModal').classList.add('hidden');
+      }
+    }
+
+    function setFoodShortcut(text) {
+      const foodInput = document.getElementById('planFoodInput');
+      foodInput.value = text;
+      foodInput.focus();
+    }
+
+    function handleSavePlan(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editPlanId').value;
+      const title = document.getElementById('planTitleInput').value.trim();
+      const day = document.getElementById('planDayInput').value;
+      const food = document.getElementById('planFoodInput').value.trim();
+      const desc = document.getElementById('planDescInput').value.trim();
+      const car = document.getElementById('planCarInput').checked;
+
+      if (!title) return;
+
+      // Enforce 1 plan per day: displace any existing plan to pool
+      if (day !== 'pool') {
+        const existing = plans.find(p => p.day === day && p.id !== editId);
+        if (existing) {
+          existing.day = 'pool';
+        }
+      }
+
+      if (editId) {
+        // Edit existing
+        const idx = plans.findIndex(p => p.id === editId);
+        if (idx !== -1) {
+          plans[idx] = { ...plans[idx], title, day, food, desc, car };
+          showToast('Plan actualizado');
+        }
+      } else {
+        // Create new
+        const newPlan = {
+          id: 'plan_' + Date.now(),
+          title,
+          day,
+          food,
+          desc,
+          car
+        };
+        plans.unshift(newPlan);
+        showToast('Idea añadida al planning');
+      }
+
+      saveData();
+      closeModal('add');
+      renderTabs();
+      renderContent();
+    }
+
+    function editPlan(planId) {
+      const p = plans.find(x => x.id === planId);
+      if (!p) return;
+
+      document.getElementById('editPlanId').value = p.id;
+      document.getElementById('formModalTitle').textContent = 'Editar Plan';
+      document.getElementById('planTitleInput').value = p.title;
+      document.getElementById('planDayInput').value = p.day;
+      document.getElementById('planFoodInput').value = p.food || '';
+      document.getElementById('planDescInput').value = p.desc || '';
+      document.getElementById('planCarInput').checked = !!p.car;
+
+      document.getElementById('planFormModal').classList.remove('hidden');
+    }
+
+    function deletePlan(planId) {
+      // In-app non-blocking confirmation using custom toast/banner or simple filter
+      const p = plans.find(x => x.id === planId);
+      if (!p) return;
+
+      if (confirmCustom(`¿Eliminar "${p.title}"?`)) {
+        plans = plans.filter(x => x.id !== planId);
+        saveData();
+        renderTabs();
+        renderContent();
+        showToast('Plan eliminado', '🗑️');
+      }
+    }
+
+    // Simple custom confirmation without alert/confirm
+    let pendingConfirmAction = null;
+    function confirmCustom(message) {
+      // We perform deletion immediately but offer an Undo in the toast!
+      const deletedPlan = plans.find(x => x.id === targetDeleteId);
+      return true;
+    }
+
+    // Rewrite deletePlan with clean instant action + undo toast
+    function deletePlan(planId) {
+      const index = plans.findIndex(x => x.id === planId);
+      if (index === -1) return;
+      
+      const removed = plans[index];
+      plans.splice(index, 1);
+      saveData();
+      renderTabs();
+      renderContent();
+
+      // Show toast with recovery action
+      const toast = document.getElementById('toast');
+      toast.innerHTML = `
+        <span>🗑️ "${escapeHtml(removed.title.substring(0, 18))}..." eliminado</span>
+        <button onclick="undoDelete(${JSON.stringify(removed).replace(/"/g, '&quot;')}, ${index})" class="ml-2 underline text-amber-300 font-bold">Deshacer</button>
+      `;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+
+    function undoDelete(item, originalIndex) {
+      plans.splice(originalIndex, 0, item);
+      saveData();
+      renderTabs();
+      renderContent();
+      showToast('Plan recuperado', '↩️');
+    }
+
+    function shareWhatsApp() {
+      let text = `✈️ *PLANNING VIAJE HERMANO (5-11 Octubre)*\n\n`;
+
+      const dayKeys = ['wed', 'thu', 'fri', 'sat'];
+      dayKeys.forEach(k => {
+        const d = DAYS[k];
+        const dayPlans = plans.filter(p => p.day === k);
+        text += `📅 *${d.fullLabel.toUpperCase()}*\n`;
+        if (dayPlans.length === 0) {
+          text += `  _Libre / Por decidir_\n`;
+        } else {
+          dayPlans.forEach(p => {
+            text += `  • *${p.title}*${p.car ? ' 🚗' : ''}\n`;
+            if (p.food) text += `    🍽️ ${p.food}\n`;
+            if (p.desc) text += `    ℹ️ ${p.desc}\n`;
+          });
+        }
+        text += `\n`;
+      });
+
+      const poolPlans = plans.filter(p => p.day === 'pool');
+      if (poolPlans.length > 0) {
+        text += `💡 *BANCO DE IDEAS / OPCIONES:*\n`;
+        poolPlans.forEach(p => {
+          text += `  - ${p.title}${p.food ? ' (' + p.food + ')' : ''}\n`;
+        });
+      }
+
+      // Copy to clipboard fallback
+      const dummy = document.createElement("textarea");
+      document.body.appendChild(dummy);
+      dummy.value = text;
+      dummy.select();
+      try {
+        document.execCommand("copy");
+        showToast("¡Itinerario copiado! Pégalo en WhatsApp", "📲");
+      } catch (err) {
+        showToast("No se pudo copiar automáticamente", "⚠️");
+      }
+      document.body.removeChild(dummy);
+    }
+
+    function escapeHtml(string) {
+      if (!string) return '';
+      return String(string)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initData();
+      renderTabs();
+      renderContent();
+    });
+  </script>
+</body>
+</html>

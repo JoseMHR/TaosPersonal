@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atenpace FisioPlanner - Gestor de Cuadrantes Integrado</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- React y Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- SheetJS (xlsx) for Excel upload parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .overflow-x-auto {
+            -webkit-overflow-scrolling: touch;
+        }
+        .scrollbar-none::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-none {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <div id="root"></div>
+
+    <!-- Firebase SDK Imports (Modular v11.6.1) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Global setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'atenpace-fisioplanner';
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) {
+                        console.warn("Auth initial signin fallback:", e);
+                    }
+                };
+                initAuth();
+
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    window.dispatchEvent(new CustomEvent('firebase-auth-ready', { detail: { user, db, appId } }));
+                });
+            } catch (err) {
+                console.warn("Firebase initialization skipped or not available:", err);
+            }
+        }
+        window.__firebase_db = db;
+        window.__firebase_app_id = appId;
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        const FISIOTERAPEUTAS = [
+            "SANDRA", "ANGELA", "VIOLETA", "FERNANDO", 
+            "BERTA", "ESTHER", "NOELIA", "CHIARA", "ANA", "JUAN"
+        ];
+
+        const DIAS = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES"];
+
+        const HORARIOS_15MIN = [
+            "09:00", "09:15", "09:30", "09:45",
+            "10:00", "10:15", "10:30", "10:45",
+            "11:00", "11:15", "11:30", "11:45",
+            "12:00", "12:15", "12:30", "12:45",
+            "13:00", "13:15", "13:30", "13:45",
+            "14:00", "14:15", "14:30", "14:45",
+            "15:00", "15:15", "15:30", "15:45",
+            "16:00"
+        ];
+
+        const CATALOGO_ALUMNOS = [
+            { id: 1, nombre: "MARIO ÁLVAREZ", centro: "CEE", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "ANGELA", observaciones: "3 ind + 1 taller. Prefiere mañanas" },
+            { id: 2, nombre: "DIANA APARICIO", centro: "CEE", cuota: 3, fisioResponsable: "VIOLETA", fisioSecundario: "FERNANDO", observaciones: "3 sesiones individuales" },
+            { id: 3, nombre: "HÉCTOR ARAGÓN", centro: "CEE", cuota: 4, fisioResponsable: "FERNANDO", fisioSecundario: "BERTA", observaciones: "2 ind + 2 taller" },
+            { id: 4, nombre: "VEGA AROCHENA", centro: "CEE", cuota: 4, fisioResponsable: "BERTA", fisioSecundario: "ESTHER", observaciones: "Alumno nuevo" },
+            { id: 5, nombre: "ALBA BIENZOBA", centro: "CEE", cuota: 4, fisioResponsable: "ESTHER", fisioSecundario: "NOELIA", observaciones: "3 ind + 1 taller" },
+            { id: 6, nombre: "AYLA CASANLENGUA", centro: "CEE", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "CHIARA", observaciones: "4 sesiones ind" },
+            { id: 7, nombre: "MANUEL COLMENAR", centro: "CEE", cuota: 4, fisioResponsable: "CHIARA", fisioSecundario: "ANA", observaciones: "3 ind + 1 taller" },
+            { id: 8, nombre: "ROCÍO DE JODRA", centro: "CEE", cuota: 4, fisioResponsable: "ANA", fisioSecundario: "JUAN", observaciones: "3 ind + 1 taller" },
+            { id: 9, nombre: "ETHAN ELEY", centro: "CEE", cuota: 4, fisioResponsable: "FERNANDO", fisioSecundario: "SANDRA", observaciones: "Ruta llega 10:15. No asignarle antes. Logo Jue 15:00" },
+            { id: 10, nombre: "NICOLÁS ELIAS", centro: "CEE", cuota: 4, fisioResponsable: "JUAN", fisioSecundario: "ANGELA", observaciones: "3 ind + 1 taller" },
+            { id: 11, nombre: "VALENTINA ERQUIAGA", centro: "CEE", cuota: 4, fisioResponsable: "ANGELA", fisioSecundario: "VIOLETA", observaciones: "Llega en ruta 10:45. 3 ind + 1 taller" },
+            { id: 12, nombre: "SARA ESTEPA", centro: "CEE", cuota: 4, fisioResponsable: "BERTA", fisioSecundario: "FERNANDO", observaciones: "3 ind + 1 taller. Logo Mié 11:30, TO Jue 10:30" },
+            { id: 13, nombre: "MARCOS FERNÁNDEZ", centro: "CEE", cuota: 4, fisioResponsable: "VIOLETA", fisioSecundario: "SANDRA", observaciones: "Llega 10:00. Logo Mar 12:15. Comer en 1er turno" },
+            { id: 14, nombre: "NICOLÁS GALLEGO", centro: "CEE", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "ESTHER", observaciones: "Comer 1er turno (siesta)" },
+            { id: 15, nombre: "ÁLVARO ALDA", centro: "CDR", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "NOELIA", observaciones: "Fisio a las 13:45. No llega a piscina de ruta" },
+            { id: 16, nombre: "ANTONIO POZO", centro: "CDR", cuota: 4, fisioResponsable: "CHIARA", fisioSecundario: "FERNANDO", observaciones: "3 ind + 1 taller" },
+            { id: 17, nombre: "LAURA BALLESTEROS", centro: "CDR", cuota: 4, fisioResponsable: "ESTHER", fisioSecundario: "BERTA", observaciones: "Padres la traen entre 9:30 y 10:00" },
+            { id: 18, nombre: "SILVIA BORRÁS", centro: "CDR", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "ANGELA", observaciones: "Piscina Mar 9:45 Sem 2" },
+            { id: 19, nombre: "MANUEL CAÑÓN", centro: "CDR", cuota: 4, fisioResponsable: "ANA", fisioSecundario: "JUAN", observaciones: "Ir al baño a las 10:45" },
+            { id: 20, nombre: "ANTONIO CARBONELL", centro: "CDR", cuota: 4, fisioResponsable: "ANGELA", fisioSecundario: "VIOLETA", observaciones: "Llega a las 9:00" },
+            { id: 21, nombre: "EDUARDO CARRASCOSA", centro: "CDR", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "BERTA", observaciones: "3 ind + 1 taller" },
+            { id: 22, nombre: "MARÍA CERNUDA", centro: "CDR", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "SANDRA", observaciones: "3 ind + 1 taller" },
+            { id: 23, nombre: "NATALIA DE LAMA", centro: "CDR", cuota: 1, fisioResponsable: "CHIARA", fisioSecundario: "ANA", observaciones: "1 sesión semanal. Comer en último turno" },
+            { id: 24, nombre: "IGNACIO DE LA PEÑA", centro: "CDR", cuota: 4, fisioResponsable: "BERTA", fisioSecundario: "ESTHER", observaciones: "Baño a las 10:45" },
+            { id: 25, nombre: "PILAR DE LA PLAZA", centro: "CDR", cuota: 4, fisioResponsable: "FERNANDO", fisioSecundario: "JUAN", observaciones: "Comer 1er turno. Fisio a última hora en silla" },
+            { id: 26, nombre: "LUCÍA VELASCO", centro: "CDR", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "SANDRA", observaciones: "No fisio después de comer. TO Lun 11:30" },
+            { id: 27, nombre: "LUCÍA BUSTAMANTE", centro: "CDR", cuota: 4, fisioResponsable: "ESTHER", fisioSecundario: "FERNANDO", observaciones: "No fisio a las 14:30" },
+            { id: 28, nombre: "CARLOS GIL", centro: "CDR", cuota: 4, fisioResponsable: "VIOLETA", fisioSecundario: "ANGELA", observaciones: "4 sesiones individuales" },
+            { id: 29, nombre: "SERGIO GISBERT", centro: "CDR", cuota: 4, fisioResponsable: "FERNANDO", fisioSecundario: "BERTA", observaciones: "Llega a las 8:25" },
+            { id: 30, nombre: "KIKE", centro: "CEE", cuota: 4, fisioResponsable: "NOELIA", fisioSecundario: "SANDRA", observaciones: "Desayuna a las 11:00" },
+            { id: 31, nombre: "PABLO", centro: "CEE", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "NOELIA", observaciones: "Piscina Lunes" },
+            { id: 32, nombre: "GONZALO", centro: "CEE", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "NOELIA", observaciones: "Piscina Lunes" },
+            { id: 33, nombre: "ANDRÉS GUARDE", centro: "CDR", cuota: 4, fisioResponsable: "CHIARA", fisioSecundario: "ANA", observaciones: "Llega >9:30. Comer 1er turno" },
+            { id: 34, nombre: "JAIME", centro: "CEE", cuota: 4, fisioResponsable: "ESTHER", fisioSecundario: "JUAN", observaciones: "Llega 10:30 (Jue 10:45 por fisio). Desayuna 11:00" },
+            { id: 35, nombre: "LOLA", centro: "CEE", cuota: 4, fisioResponsable: "BERTA", fisioSecundario: "ESTHER", observaciones: "Comer en 1er turno" },
+            { id: 36, nombre: "SOFÍA PATRICIO", centro: "CEE", cuota: 4, fisioResponsable: "SANDRA", fisioSecundario: "FERNANDO", observaciones: "Llega cuando quiere. Comer entre 12:30 y 14:30" }
+        ];
+
+        const HORARIOS_OTRAS_DISCIPLINAS = [
+            { alumno: "MARIO ÁLVAREZ", dia: "LUNES", hora: "10:30", duracion: 45, disciplina: "Logopedia" },
+            { alumno: "ETHAN ELEY", dia: "JUEVES", hora: "15:00", duracion: 45, disciplina: "Logopedia" },
+            { alumno: "SARA ESTEPA", dia: "MIÉRCOLES", hora: "11:30", duracion: 45, disciplina: "Logopedia" },
+            { alumno: "SARA ESTEPA", dia: "JUEVES", hora: "10:30", duracion: 45, disciplina: "Terapia Ocupacional" },
+            { alumno: "LUCÍA VELASCO", dia: "LUNES", hora: "11:30", duracion: 45, disciplina: "Terapia Ocupacional" },
+            { alumno: "MARCOS FERNÁNDEZ", dia: "MARTES", hora: "12:15", duracion: 45, disciplina: "Logopedia" }
+        ];
+
+        const ESTRUCTURA_INAMOVIBLE = {
+            "SANDRA_LUNES_09:00": { tipo: "COORDINACION", label: "Coord. Servicios", bloqueo: true, duracion: 45 },
+            "SANDRA_MARTES_09:00": { tipo: "COORDINACION", label: "SESIÓN CLÍNICA", bloqueo: true, duracion: 45 },
+            "SANDRA_JUEVES_09:00": { tipo: "COORDINACION", label: "INDIRECTO CEE", bloqueo: true, duracion: 45 },
+            "SANDRA_VIERNES_09:00": { tipo: "COORDINACION", label: "REUNIÓN EQUIPO", bloqueo: true, duracion: 45 },
+            "VIOLETA_LUNES_09:45": { tipo: "COORDINACION", label: "ECA", bloqueo: true, duracion: 45 },
+            "VIOLETA_MARTES_09:45": { tipo: "COORDINACION", label: "ECA", bloqueo: true, duracion: 45 },
+
+            "ANGELA_LUNES_09:45": { tipo: "RESPI", label: "RESPIRATORIO", bloqueo: true, duracion: 45 },
+            "NOELIA_MARTES_09:45": { tipo: "RESPI", label: "RESPIRATORIO", bloqueo: true, duracion: 45 },
+            "ESTHER_MIÉRCOLES_09:45": { tipo: "RESPI", label: "RESPIRATORIO", bloqueo: true, duracion: 45 },
+            "CHIARA_JUEVES_09:45": { tipo: "RESPI", label: "RESPIRATORIO", bloqueo: true, duracion: 45 },
+            "JUAN_VIERNES_09:45": { tipo: "RESPI", label: "RESPIRATORIO", bloqueo: true, duracion: 45 },
+
+            "SANDRA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "ANGELA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "VIOLETA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "FERNANDO_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "BERTA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "ESTHER_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "NOELIA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "CHIARA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "ANA_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+            "JUAN_LUNES_11:15": { tipo: "DESAYUNO", label: "Desayuno", bloqueo: true, duracion: 15 },
+
+            "BERTA_LUNES_09:45": { tipo: "DESAHABILITADO", label: "No contratado", bloqueo: true, duracion: 45 }
+        };
+
+        const DETALLE_PISCINA_HORARIOS = [
+            { turno: 1, vestuarioEntrada: "09:45", aguaEntrada: "09:50", aguaSalida: "10:20", aulaLlegada: "10:35" },
+            { turno: 1, vestuarioEntrada: "09:55", aguaEntrada: "10:00", aguaSalida: "10:30", aulaLlegada: "10:45" },
+            { turno: 2, vestuarioEntrada: "10:15", aguaEntrada: "10:30", aguaSalida: "11:00", aulaLlegada: "11:15" },
+            { turno: 2, vestuarioEntrada: "10:25", aguaEntrada: "10:40", aguaSalida: "11:05", aulaLlegada: "11:20" },
+            { turno: 3, vestuarioEntrada: "10:45", aguaEntrada: "11:00", aguaSalida: "11:30", aulaLlegada: "11:45" },
+            { turno: 3, vestuarioEntrada: "11:05", aguaEntrada: "11:20", aguaSalida: "11:45", aulaLlegada: "12:00" },
+            { turno: 4, vestuarioEntrada: "11:20", aguaEntrada: "11:30", aguaSalida: "12:00", aulaLlegada: "12:15" },
+            { turno: 4, vestuarioEntrada: "11:40", aguaEntrada: "11:50", aguaSalida: "12:20", aulaLlegada: "12:35" }
+        ];
+
+        const PISCINA_SEMANA_1 = {
+            "NOELIA_LUNES_09:45": { tipo: "PISCINA", label: "PISCINA (KIKE)", alumno: "KIKE", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "SANDRA_LUNES_09:45": { tipo: "PISCINA", label: "PISCINA (PABLO)", alumno: "PABLO", bloqueo: true, duracion: 45, horaAgua: "10:00-10:30" },
+            "NOELIA_LUNES_10:30": { tipo: "PISCINA", label: "PISCINA (GALLEGO)", alumno: "NICOLÁS GALLEGO", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "SANDRA_LUNES_10:30": { tipo: "PISCINA", label: "PISCINA (GONZALO)", alumno: "GONZALO", bloqueo: true, duracion: 45, horaAgua: "10:40-11:05" },
+            "BERTA_MARTES_09:45": { tipo: "PISCINA", label: "PISCINA (INÉS)", alumno: "INÉS", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "BERTA_MARTES_10:30": { tipo: "PISCINA", label: "PISCINA (LARRAURI)", alumno: "LARRAURI", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "VIOLETA_MIÉRCOLES_09:45": { tipo: "PISCINA", label: "PISCINA (EMMA)", alumno: "EMMA", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "VIOLETA_MIÉRCOLES_10:30": { tipo: "PISCINA", label: "PISCINA (CATALEYA)", alumno: "CATALEYA", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "ESTHER_JUEVES_09:45": { tipo: "PISCINA", label: "PISCINA (ITZIAR)", alumno: "ITZIAR", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "ESTHER_JUEVES_10:30": { tipo: "PISCINA", label: "PISCINA (CARMEN)", alumno: "CARMEN", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" }
+        };
+
+        const PISCINA_SEMANA_2 = {
+            "NOELIA_LUNES_09:45": { tipo: "PISCINA", label: "PISCINA (CERNUDA)", alumno: "MARÍA CERNUDA", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "SANDRA_LUNES_09:45": { tipo: "PISCINA", label: "PISCINA (SILVIA)", alumno: "SILVIA BORRÁS", bloqueo: true, duracion: 45, horaAgua: "10:00-10:30" },
+            "NOELIA_LUNES_10:30": { tipo: "PISCINA", label: "PISCINA (CARRASCOSA)", alumno: "EDUARDO CARRASCOSA", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "SANDRA_LUNES_10:30": { tipo: "PISCINA", label: "PISCINA (ALDA)", alumno: "ÁLVARO ALDA", bloqueo: true, duracion: 45, horaAgua: "10:40-11:05" },
+            "BERTA_MARTES_09:45": { tipo: "PISCINA", label: "PISCINA (COCO)", alumno: "COCO", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "BERTA_MARTES_10:30": { tipo: "PISCINA", label: "PISCINA (JULIA)", alumno: "JULIA", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "VIOLETA_MIÉRCOLES_09:45": { tipo: "PISCINA", label: "PISCINA (GIL)", alumno: "CARLOS GIL", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "VIOLETA_MIÉRCOLES_10:30": { tipo: "PISCINA", label: "PISCINA (TONI)", alumno: "TONI", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" },
+            "ESTHER_JUEVES_09:45": { tipo: "PISCINA", label: "PISCINA (IRENE)", alumno: "IRENE", bloqueo: true, duracion: 45, horaAgua: "09:50-10:20" },
+            "ESTHER_JUEVES_10:30": { tipo: "PISCINA", label: "PISCINA (BELÉN)", alumno: "BELÉN", bloqueo: true, duracion: 45, horaAgua: "10:30-11:00" }
+        };
+
+        function timeToMin(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.toString().split(':');
+            const h = parseInt(parts[0], 10) || 0;
+            const m = parseInt(parts[1], 10) || 0;
+            return h * 60 + m;
+        }
+
+        function minToTime(mins) {
+            const h = Math.floor(mins / 60).toString().padStart(2, '0');
+            const m = (mins % 60).toString().padStart(2, '0');
+            return `${h}:${m}`;
+        }
+
+        function App() {
+            const [semana, setSemana] = useState("1");
+            const [vistaActual, setVistaActual] = useState("matriz");
+            const [diaSeleccionado, setDiaSeleccionado] = useState("LUNES");
+            const [fisioSeleccionado, setFisioSeleccionado] = useState("SANDRA");
+            const [alumnoSeleccionado, setAlumnoSeleccionado] = useState("MARIO ÁLVAREZ");
+            const [alumnoBuscado, setAlumnoBuscado] = useState("");
+            const [filtroCentro, setFiltroCentro] = useState("TODOS");
+            const [modalAsignacion, setModalAsignacion] = useState(null);
+            const [notificacion, setNotificacion] = useState(null);
+            const [cargandoPersistencia, setCargandoPersistencia] = useState(false);
+            
+            const [catalogoAlumnos, setCatalogoAlumnos] = useState(CATALOGO_ALUMNOS);
+
+            // Load initial state from Firestore or localStorage if available
+            const [sesiones, setSesionesState] = useState(() => {
+                const localSaved = localStorage.getItem('atenpace_cuadrante_sesiones');
+                if (localSaved) {
+                    try { return JSON.parse(localSaved); } catch (e) {}
+                }
+                return {
+                    ...ESTRUCTURA_INAMOVIBLE,
+                    ...PISCINA_SEMANA_1
+                };
+            });
+
+            const [historialPast, setHistorialPast] = useState([]);
+            const [historialFuture, setHistorialFuture] = useState([]);
+            const fileInputRef = useRef(null);
+
+            // Save persistent data to localStorage & Firestore whenever 'sesiones' changes
+            const guardarPersistencia = useCallback((nuevasSesiones) => {
+                try {
+                    localStorage.setItem('atenpace_cuadrante_sesiones', JSON.stringify(nuevasSesiones));
+                    if (window.__firebase_db) {
+                        const db = window.__firebase_db;
+                        const appId = window.__firebase_app_id || 'atenpace-fisioplanner';
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'cuadranteData', 'estadoActual');
+                        setDoc(docRef, {
+                            sesiones: nuevasSesiones,
+                            actualizado: new Date().toISOString()
+                        }, { merge: true }).catch(err => console.log("Cloud sync note:", err));
+                    }
+                } catch (e) {
+                    console.warn("Storage error:", e);
+                }
+            }, []);
+
+            const setSesiones = useCallback((nuevoEstado, registrarHistorial = true) => {
+                setSesionesState(prev => {
+                    const proximo = typeof nuevoEstado === 'function' ? nuevoEstado(prev) : nuevoEstado;
+                    if (registrarHistorial) {
+                        setHistorialPast(past => [...past, prev]);
+                        setHistorialFuture([]);
+                    }
+                    guardarPersistencia(proximo);
+                    return proximo;
+                });
+            }, [guardarPersistencia]);
+
+            // Sync with Cloud Firestore on mount if available
+            useEffect(() => {
+                const handleReady = (e) => {
+                    const { db, appId } = e.detail;
+                    if (!db) return;
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'cuadranteData', 'estadoActual');
+                        onSnapshot(docRef, (snapshot) => {
+                            if (snapshot.exists()) {
+                                const data = snapshot.data();
+                                if (data && data.sesiones) {
+                                    setSesionesState(data.sesiones);
+                                    localStorage.setItem('atenpace_cuadrante_sesiones', JSON.stringify(data.sesiones));
+                                }
+                            }
+                        }, (error) => console.log("Firestore snapshot info:", error));
+                    } catch (err) {
+                        console.log("Firestore listener note:", err);
+                    }
+                };
+
+                window.addEventListener('firebase-auth-ready', handleReady);
+                return () => window.removeEventListener('firebase-auth-ready', handleReady);
+            }, []);
+
+            const deshacer = () => {
+                if (historialPast.length === 0) return;
+                const anterior = historialPast[historialPast.length - 1];
+                setHistorialPast(past => past.slice(0, past.length - 1));
+                setHistorialFuture(future => [sesiones, ...future]);
+                setSesionesState(anterior);
+                guardarPersistencia(anterior);
+                setNotificacion({ tipo: "info", mensaje: "Acción deshecha correctamente." });
+                setTimeout(() => setNotificacion(null), 3000);
+            };
+
+            const rehacer = () => {
+                if (historialFuture.length === 0) return;
+                const siguiente = historialFuture[0];
+                setHistorialFuture(future => future.slice(1));
+                setHistorialPast(past => [...past, sesiones]);
+                setSesionesState(siguiente);
+                guardarPersistencia(siguiente);
+                setNotificacion({ tipo: "info", mensaje: "Acción rehecha." });
+                setTimeout(() => setNotificacion(null), 3000);
+            };
+
+            useEffect(() => {
+                setSesiones(prev => {
+                    const limpia = { ...prev };
+                    Object.keys(limpia).forEach(k => {
+                        if (limpia[k]?.tipo === "PISCINA") delete limpia[k];
+                    });
+                    const piscinaNueva = semana === "1" ? PISCINA_SEMANA_1 : PISCINA_SEMANA_2;
+                    return { ...limpia, ...piscinaNueva };
+                }, false);
+            }, [semana]);
+
+            const vaciarCuadrante = () => {
+                const piscinaActual = semana === "1" ? PISCINA_SEMANA_1 : PISCINA_SEMANA_2;
+                const estadoLimpio = {
+                    ...ESTRUCTURA_INAMOVIBLE,
+                    ...piscinaActual
+                };
+                setSesiones(estadoLimpio);
+                setNotificacion({
+                    tipo: "info",
+                    mensaje: "Cuadrante vaciado. Se conservan reuniones, piscina y descansos fijos."
+                });
+                setTimeout(() => setNotificacion(null), 4000);
+            };
+
+            const procesarArchivoExcel = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setCargandoPersistencia(true);
+                const reader = new FileReader();
+
+                reader.onload = (evt) => {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        let sesionesImportadas = { ...ESTRUCTURA_INAMOVIBLE };
+                        let contadorSesiones = 0;
+
+                        // Parse each sheet if applicable
+                        workbook.SheetNames.forEach(sheetName => {
+                            const worksheet = workbook.Sheets[sheetName];
+                            const jsonSheet = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                            if (jsonSheet.length < 5) return;
+
+                            // Look for therapist names in header row
+                            let headerRowIdx = -1;
+                            let fisioCols = {};
+
+                            for (let r = 0; r < Math.min(10, jsonSheet.length); r++) {
+                                const row = jsonSheet[r];
+                                if (!row) continue;
+                                row.forEach((cell, colIdx) => {
+                                    if (cell && typeof cell === 'string') {
+                                        const cleanVal = cell.trim().toUpperCase();
+                                        const foundFisio = FISIOTERAPEUTAS.find(f => cleanVal.includes(f));
+                                        if (foundFisio) {
+                                            headerRowIdx = r;
+                                            fisioCols[colIdx] = foundFisio;
+                                        }
+                                    }
+                                });
+                                if (headerRowIdx !== -1) break;
+                            }
+
+                            // Read timetable rows
+                            if (headerRowIdx !== -1) {
+                                for (let r = headerRowIdx + 1; r < jsonSheet.length; r++) {
+                                    const row = jsonSheet[r];
+                                    if (!row || row.length === 0) continue;
+
+                                    let timeVal = row[0] || row[1];
+                                    if (!timeVal) continue;
+
+                                    let horaStr = "";
+                                    if (typeof timeVal === 'number') {
+                                        // Excel time float conversion
+                                        const totalMins = Math.round(timeVal * 24 * 60);
+                                        horaStr = minToTime(totalMins);
+                                    } else {
+                                        const match = timeVal.toString().match(/(\d{1,2}:\d{2})/);
+                                        if (match) horaStr = match[1].padStart(5, '0');
+                                    }
+
+                                    if (!HORARIOS_15MIN.includes(horaStr)) continue;
+
+                                    // Map cell values to therapists
+                                    Object.entries(fisioCols).forEach(([colIdx, fisio]) => {
+                                        const cellVal = row[colIdx];
+                                        if (cellVal && typeof cellVal === 'string' && cellVal.trim().length > 1) {
+                                            const alumnoTexto = cellVal.trim();
+                                            if (["DESAYUNO", "RESPIRATORIO", "ECA", "SESION CLINICA", "INDIRECTO"].some(b => alumnoTexto.toUpperCase().includes(b))) {
+                                                return;
+                                            }
+                                            
+                                            // Match with student catalog or assign text
+                                            const alumnoEncontrado = CATALOGO_ALUMNOS.find(a => 
+                                                a.nombre.toLowerCase().includes(alumnoTexto.toLowerCase()) || 
+                                                alumnoTexto.toLowerCase().includes(a.nombre.split(' ')[0].toLowerCase())
+                                            );
+
+                                            const nombreFinal = alumnoEncontrado ? alumnoEncontrado.nombre : alumnoTexto;
+                                            const key = `${fisio}_${diaSeleccionado}_${horaStr}`;
+
+                                            sesionesImportadas[key] = {
+                                                tipo: "INDIVIDUAL",
+                                                label: nombreFinal,
+                                                alumno: nombreFinal,
+                                                duracion: 45
+                                            };
+                                            contadorSesiones++;
+                                        }
+                                    });
+                                }
+                            }
+                        });
+
+                        const piscinaActual = semana === "1" ? PISCINA_SEMANA_1 : PISCINA_SEMANA_2;
+                        const resultadoFinal = { ...sesionesImportadas, ...piscinaActual };
+
+                        setSesiones(resultadoFinal);
+                        setCargandoPersistencia(false);
+                        setNotificacion({
+                            tipo: "exito",
+                            mensaje: `¡Volcado de datos desde Excel completado! Se han cargado ${contadorSesiones} tratamientos.`
+                        });
+                        setTimeout(() => setNotificacion(null), 5000);
+
+                    } catch (err) {
+                        console.error("Error al procesar Excel:", err);
+                        setCargandoPersistencia(false);
+                        setNotificacion({
+                            tipo: "advertencia",
+                            mensaje: "No se pudo interpretar la estructura del Excel. Asegúrate de adjuntar una hoja de cuadrantes válida."
+                        });
+                        setTimeout(() => setNotificacion(null), 5000);
+                    }
+                };
+
+                reader.readAsArrayBuffer(file);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+            };
+
+            const actualizarFisioResponsable = (idAlumno, campo, valor) => {
+                setCatalogoAlumnos(prev => prev.map(a => {
+                    if (a.id === idAlumno) {
+                        return { ...a, [campo]: valor };
+                    }
+                    return a;
+                }));
+                setNotificacion({
+                    tipo: "exito",
+                    mensaje: `Fisioterapeuta asignado actualizado correctamente para el alumno.`
+                });
+                setTimeout(() => setNotificacion(null), 3000);
+            };
+
+            const generarCuadranteAutomatico = () => {
+                const piscinaActual = semana === "1" ? PISCINA_SEMANA_1 : PISCINA_SEMANA_2;
+                const copia = {
+                    ...ESTRUCTURA_INAMOVIBLE,
+                    ...piscinaActual
+                };
+
+                const diasAsignadosPorAlumno = {};
+                catalogoAlumnos.forEach(a => {
+                    diasAsignadosPorAlumno[a.nombre] = new Set();
+                });
+
+                Object.values(piscinaActual).forEach(p => {
+                    if (p.alumno && diasAsignadosPorAlumno[p.alumno]) {
+                        const key = Object.keys(piscinaActual).find(k => piscinaActual[k] === p);
+                        if (key) {
+                            const parts = key.split('_');
+                            if (parts.length >= 2) diasAsignadosPorAlumno[p.alumno].add(parts[1]);
+                        }
+                    }
+                });
+
+                const HORARIOS_INICIO_SESION = ["09:00", "09:45", "10:30", "11:30", "12:15", "13:00", "13:45", "15:00", "15:45"];
+
+                catalogoAlumnos.forEach(alumno => {
+                    let asignadas = Object.values(copia).filter(s => s.alumno === alumno.nombre).length;
+                    const meta = alumno.cuota;
+
+                    if (asignadas >= meta) return;
+
+                    const fisiosOrdenados = [];
+                    if (alumno.fisioResponsable) fisiosOrdenados.push(alumno.fisioResponsable);
+                    if (alumno.fisioSecundario && alumno.fisioSecundario !== alumno.fisioResponsable) fisiosOrdenados.push(alumno.fisioSecundario);
+                    FISIOTERAPEUTAS.forEach(f => {
+                        if (!fisiosOrdenados.includes(f)) fisiosOrdenados.push(f);
+                    });
+
+                    for (let d = 0; d < DIAS.length && asignadas < meta; d++) {
+                        const dia = DIAS[d];
+
+                        if (diasAsignadosPorAlumno[alumno.nombre].has(dia)) continue;
+
+                        let asignado = false;
+
+                        for (let h = 0; h < HORARIOS_INICIO_SESION.length && !asignado; h++) {
+                            const hora = HORARIOS_INICIO_SESION[h];
+                            const horaMin = timeToMin(hora);
+
+                            if (alumno.nombre.includes("ETHAN") && horaMin < timeToMin("10:15")) continue;
+                            if (alumno.nombre.includes("VALENTINA") && horaMin < timeToMin("10:45")) continue;
+                            if (alumno.nombre.includes("MARCOS") && horaMin < timeToMin("10:00")) continue;
+                            if (alumno.nombre.includes("BALLESTEROS") && horaMin < timeToMin("09:30")) continue;
+                            if (alumno.nombre.includes("VELASCO") && horaMin >= timeToMin("14:30")) continue;
+                            if (alumno.nombre.includes("BUSTAMANTE") && hora === "14:30") continue;
+                            if (alumno.nombre.includes("PLAZA") && (hora !== "15:00" && hora !== "15:45" && hora !== "13:45")) continue;
+
+                            const conflictoMultidisciplinar = HORARIOS_OTRAS_DISCIPLINAS.some(o => {
+                                if (o.alumno !== alumno.nombre || o.dia !== dia) return false;
+                                const oInicio = timeToMin(o.hora);
+                                const oFin = oInicio + o.duracion;
+                                const sInicio = horaMin;
+                                const sFin = sInicio + 45;
+                                return (sInicio < oFin && sFin > oInicio);
+                            });
+                            if (conflictoMultidisciplinar) continue;
+
+                            const yaOcupadoEnHora = Object.entries(copia).some(([k, v]) => {
+                                const [f, d_k, h_k] = k.split('_');
+                                if (d_k !== dia || v.alumno !== alumno.nombre) return false;
+                                const kMin = timeToMin(h_k);
+                                return (Math.abs(kMin - horaMin) < 45);
+                            });
+                            if (yaOcupadoEnHora) continue;
+
+                            for (let f = 0; f < fisiosOrdenados.length && !asignado; f++) {
+                                const fisio = fisiosOrdenados[f];
+                                const key = `${fisio}_${dia}_${hora}`;
+
+                                const fisioOcupado = [0, 15, 30].some(offset => {
+                                    const subHora = minToTime(horaMin + offset);
+                                    return copia[`${fisio}_${dia}_${subHora}`] !== undefined;
+                                });
+
+                                if (!fisioOcupado) {
+                                    copia[key] = {
+                                        tipo: "INDIVIDUAL",
+                                        label: alumno.nombre,
+                                        alumno: alumno.nombre,
+                                        duracion: 45
+                                    };
+                                    diasAsignadosPorAlumno[alumno.nombre].add(dia);
+                                    asignadas++;
+                                    asignado = true;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                setSesiones(copia);
+                setNotificacion({
+                    tipo: "exito",
+                    mensaje: "¡Cuadrante autogenerado y guardado persistentemente con éxito!"
+                });
+                setTimeout(() => setNotificacion(null), 5000);
+            };
+
+            const auditoria = useMemo(() => {
+                const avisos = [];
+
+                catalogoAlumnos.forEach(alumno => {
+                    const count = Object.values(sesiones).filter(s => s.alumno === alumno.nombre).length;
+                    if (count < alumno.cuota) {
+                        avisos.push({
+                            tipo: "cuota",
+                            mensaje: `${alumno.nombre} tiene ${count}/${alumno.cuota} sesiones asignadas.`
+                        });
+                    }
+                });
+
+                HORARIOS_OTRAS_DISCIPLINAS.forEach(o => {
+                    const oInicio = timeToMin(o.hora);
+                    const oFin = oInicio + o.duracion;
+
+                    Object.entries(sesiones).forEach(([key, val]) => {
+                        if (val.alumno === o.alumno) {
+                            const [fisio, dia, hora] = key.split('_');
+                            if (dia === o.dia) {
+                                const fInicio = timeToMin(hora);
+                                const fFin = fInicio + (val.duracion || 45);
+                                if (fInicio < oFin && fFin > oInicio) {
+                                    avisos.push({
+                                        tipo: "solapamiento",
+                                        mensaje: `¡SOLAPAMIENTO! ${o.alumno} coincide en Fisio (${fisio} a las ${hora}) y ${o.disciplina} (${o.hora}) el ${dia}.`
+                                    });
+                                }
+                            }
+                        }
+                    });
+                });
+
+                return avisos;
+            }, [sesiones, catalogoAlumnos]);
+
+            const abrirModalAsignacion = (fisio, dia, hora) => {
+                const key = `${fisio}_${dia}_${hora}`;
+                const actual = sesiones[key];
+
+                if (actual && actual.bloqueo && actual.tipo !== "INDIVIDUAL") {
+                    setNotificacion({
+                        tipo: "advertencia",
+                        mensaje: `El bloque "${actual.label}" es institucional fijo y no se modifica.`
+                    });
+                    setTimeout(() => setNotificacion(null), 3000);
+                    return;
+                }
+
+                setModalAsignacion({ fisio, dia, hora, key, actual });
+            };
+
+            const guardarAsignacionManual = (nombreAlumno) => {
+                if (!modalAsignacion) return;
+                const { key } = modalAsignacion;
+
+                if (!nombreAlumno) {
+                    setSesiones(prev => {
+                        const copia = { ...prev };
+                        delete copia[key];
+                        return copia;
+                    });
+                } else {
+                    setSesiones(prev => ({
+                        ...prev,
+                        [key]: {
+                            tipo: "INDIVIDUAL",
+                            label: nombreAlumno,
+                            alumno: nombreAlumno,
+                            duracion: 45
+                        }
+                    }));
+                }
+                setModalAsignacion(null);
+                setNotificacion({
+                    tipo: "exito",
+                    mensaje: nombreAlumno ? `Asignado ${nombreAlumno} correctamente.` : "Sesión liberada."
+                });
+                setTimeout(() => setNotificacion(null), 3000);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100">
+                    <header className="bg-slate-800/90 backdrop-blur border-b border-slate-700 sticky top-0 z-30 px-3 sm:px-6 py-3">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div className="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-start">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white px-3 py-1.5 rounded-xl shadow-md flex items-center justify-center">
+                                        <svg viewBox="0 0 280 85" className="h-8 w-auto">
+                                            <path d="M 35 24 A 32 18 0 0 1 125 24" fill="none" stroke="#f95700" strokeWidth="8" strokeLinecap="round" />
+                                            <text x="5" y="60" fontFamily="'Inter', sans-serif" fontWeight="800" fontSize="42" fill="#0f172a" letterSpacing="-1">atenpace</text>
+                                            <text x="75" y="80" fontFamily="'Inter', sans-serif" fontWeight="500" fontSize="16" fill="#334155" letterSpacing="0.5">mejorando vidas</text>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-base sm:text-lg font-bold text-white tracking-wide">FisioPlanner</h1>
+                                        <p className="text-[10px] sm:text-xs text-slate-400">Gestión Integrada y Multidisciplinar</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                                    <button
+                                        onClick={deshacer}
+                                        disabled={historialPast.length === 0}
+                                        title="Deshacer cambio (Undo)"
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                            historialPast.length > 0 ? "bg-slate-800 text-indigo-300 hover:bg-indigo-600 hover:text-white" : "text-slate-600 cursor-not-allowed"
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-rotate-left"></i>
+                                        <span className="hidden sm:inline">Deshacer</span>
+                                    </button>
+                                    <button
+                                        onClick={rehacer}
+                                        disabled={historialFuture.length === 0}
+                                        title="Rehacer cambio (Redo)"
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                            historialFuture.length > 0 ? "bg-slate-800 text-indigo-300 hover:bg-indigo-600 hover:text-white" : "text-slate-600 cursor-not-allowed"
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-rotate-right"></i>
+                                        <span className="hidden sm:inline">Rehacer</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full md:w-auto">
+                                <div className="bg-slate-900/80 p-1 rounded-xl border border-slate-700 flex flex-1 sm:flex-none justify-center">
+                                    <button
+                                        onClick={() => setSemana("1")}
+                                        className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                            semana === "1" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-water mr-1"></i> Sem. 1 (Piscina A)
+                                    </button>
+                                    <button
+                                        onClick={() => setSemana("2")}
+                                        className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                            semana === "2" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-water mr-1"></i> Sem. 2 (Piscina B)
+                                    </button>
+                                </div>
+
+                                {/* Excel File Upload Button */}
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={procesarArchivoExcel}
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                                    className="bg-purple-700 hover:bg-purple-600 text-white font-semibold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow"
+                                    title="Importar cuadrante desde archivo .xlsx"
+                                >
+                                    <i className="fa-solid fa-file-excel"></i>
+                                    <span>Cargar Excel</span>
+                                </button>
+
+                                <button
+                                    onClick={generarCuadranteAutomatico}
+                                    className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2"
+                                >
+                                    <i className="fa-solid fa-wand-magic-sparkles"></i>
+                                    Auto-Generar
+                                </button>
+
+                                <button
+                                    onClick={vaciarCuadrante}
+                                    className="bg-slate-800 hover:bg-rose-900/40 text-rose-400 border border-rose-800/50 font-semibold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
+                                >
+                                    <i className="fa-solid fa-trash-can"></i>
+                                    Vaciar
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {notificacion && (
+                        <div className={`mx-auto my-2 max-w-4xl w-full px-4 py-2.5 rounded-xl border text-xs flex items-center justify-between shadow-xl ${
+                            notificacion.tipo === 'exito' ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200' :
+                            notificacion.tipo === 'advertencia' ? 'bg-amber-950/90 border-amber-500 text-amber-200' :
+                            'bg-indigo-950/90 border-indigo-500 text-indigo-200'
+                        }`}>
+                            <div className="flex items-center gap-2">
+                                <i className={`fa-solid ${notificacion.tipo === 'exito' ? 'fa-circle-check' : 'fa-circle-info'}`}></i>
+                                <span>{notificacion.mensaje}</span>
+                            </div>
+                            <button onClick={() => setNotificacion(null)} className="opacity-60 hover:opacity-100">
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="bg-slate-800/40 border-b border-slate-800 px-3 sm:px-6 py-2">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                    auditoria.length === 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                    {auditoria.length} Avisos Auditoría
+                                </span>
+                                <span className="text-slate-400 hidden sm:inline">
+                                    {auditoria.length === 0 ? "¡Cuadrante optimizado sin solapamientos!" : "Revisa la pestaña Auditoría para más detalles."}
+                                </span>
+                            </div>
+                            <div className="flex gap-4 text-slate-400 text-xs">
+                                <span><strong className="text-white">10</strong> Fisios</span>
+                                <span><strong className="text-white">36</strong> Alumnos</span>
+                                <span className="text-emerald-400 font-semibold">
+                                    <i className="fa-solid fa-circle-check mr-1"></i>
+                                    {catalogoAlumnos.filter(a => Object.values(sesiones).filter(s => s.alumno === a.nombre).length >= a.cuota).length}/{catalogoAlumnos.length} con cuota completa
+                                </span>
+                                <span className="text-indigo-400"><i className="fa-solid fa-floppy-disk mr-1"></i>Persistencia Activa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {}
+                    <div className="bg-slate-900 border-b border-slate-800 px-3 sm:px-6 py-2">
+                        <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                            <button
+                                onClick={() => setVistaActual("matriz")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "matriz" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-table-cells"></i> Cuadrante Matriz (15m)
+                            </button>
+                            <button
+                                onClick={() => setVistaActual("fisio")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "fisio" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-user-doctor"></i> Vista Fisioterapeuta
+                            </button>
+
+                            <button
+                                onClick={() => setVistaActual("alumno")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "alumno" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-user-graduate"></i> Vista por Alumno
+                            </button>
+
+                            <button
+                                onClick={() => setVistaActual("piscina")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "piscina" ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-water"></i> Horario Real Piscina
+                            </button>
+
+                            <button
+                                onClick={() => setVistaActual("alumnos")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "alumnos" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-address-book"></i> Alumnos & Cuotas
+                            </button>
+                            <button
+                                onClick={() => setVistaActual("auditoria")}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                                    vistaActual === "auditoria" ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30" : "text-slate-400 hover:bg-slate-800"
+                                }`}
+                            >
+                                <i className="fa-solid fa-triangle-exclamation"></i> Auditoría
+                            </button>
+                        </div>
+                    </div>
+
+                    {}
+                    <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6">
+                        {/* Vista Matriz */}
+                        {vistaActual === "matriz" && (
+                            <div className="space-y-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700">
+                                    <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                                        <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Día:</span>
+                                        <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700 shrink-0">
+                                            {DIAS.map(d => (
+                                                <button
+                                                    key={d}
+                                                    onClick={() => setDiaSeleccionado(d)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                        diaSeleccionado === d ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
+                                                    }`}
+                                                >
+                                                    {d}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500/30 border border-cyan-400"></span> Piscina</span>
+                                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500/30 border border-purple-400"></span> Reunión/Coord</span>
+                                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500/30 border border-emerald-400"></span> Fisio 45m</span>
+                                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-700/50 border border-slate-600"></span> Descanso/No contr.</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-x-auto shadow-2xl touch-pan-x max-h-[70vh]">
+                                    <table className="w-full text-left border-collapse min-w-[950px]">
+                                        <thead className="sticky top-0 z-20 bg-slate-900 border-b border-slate-700 text-xs">
+                                            <tr>
+                                                <th className="p-2.5 font-bold w-16 text-center sticky left-0 bg-slate-900 z-30 border-r border-slate-700 shadow-md">Hora (15m)</th>
+                                                {FISIOTERAPEUTAS.map(f => (
+                                                    <th key={f} className="p-2.5 font-bold text-center border-r border-slate-700/50 last:border-0">
+                                                        {f}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/30 text-xs">
+                                            {(() => {
+                                                const skipMap = {};
+                                                FISIOTERAPEUTAS.forEach(f => { skipMap[f] = 0; });
+
+                                                return HORARIOS_15MIN.map(hora => (
+                                                    <tr key={hora} className="hover:bg-slate-700/20 transition-colors">
+                                                        <td className="p-1.5 text-center font-bold text-slate-400 sticky left-0 bg-slate-900 z-10 border-r border-slate-700 text-[11px] shadow-md border-b border-slate-800/50">
+                                                            {hora}
+                                                        </td>
+                                                        {FISIOTERAPEUTAS.map(fisio => {
+                                                            if (skipMap[fisio] > 0) {
+                                                                skipMap[fisio]--;
+                                                                return null;
+                                                            }
+
+                                                            const key = `${fisio}_${diaSeleccionado}_${hora}`;
+                                                            const s = sesiones[key];
+
+                                                            let span = 1;
+                                                            let bg = "bg-slate-900/30 text-slate-500 cursor-pointer hover:bg-slate-700/40 border-b border-slate-800/40";
+                                                            let label = "+";
+
+                                                            if (s) {
+                                                                const dur = s.duracion || 45;
+                                                                span = Math.max(1, Math.round(dur / 15));
+                                                                skipMap[fisio] = span - 1;
+
+                                                                if (s.tipo === "COORDINACION") {
+                                                                    bg = "bg-purple-950/90 border border-purple-500/50 text-purple-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "PISCINA") {
+                                                                    bg = "bg-cyan-950/90 border border-cyan-500/60 text-cyan-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "RESPI") {
+                                                                    bg = "bg-teal-950/90 border border-teal-500/60 text-teal-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "DESAYUNO") {
+                                                                    bg = "bg-slate-800/80 text-slate-400 italic text-[10px]";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "DESAHABILITADO") {
+                                                                    bg = "bg-slate-950/90 text-slate-600";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "INDIVIDUAL") {
+                                                                    bg = "bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 font-bold cursor-pointer hover:bg-emerald-900/80 shadow-inner";
+                                                                    label = s.alumno;
+                                                                }
+                                                            }
+
+                                                            return (
+                                                                <td
+                                                                    key={key}
+                                                                    rowSpan={span}
+                                                                    onClick={() => abrirModalAsignacion(fisio, diaSeleccionado, hora)}
+                                                                    className={`p-2 text-center border-r border-b border-slate-700/40 align-middle transition-all text-[11px] ${bg}`}
+                                                                >
+                                                                    <div className="flex flex-col items-center justify-center h-full gap-0.5 min-h-[32px]">
+                                                                        <span className="truncate max-w-[120px]" title={label}>
+                                                                            {label}
+                                                                        </span>
+                                                                        {s && s.tipo === "INDIVIDUAL" && (
+                                                                            <span className="text-[9px] text-emerald-400/80 font-normal">
+                                                                                (45 min)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ));
+                                            })()}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Vista por Fisioterapeuta */}
+                        {vistaActual === "fisio" && (
+                            <div className="space-y-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700">
+                                    <div className="flex items-center gap-3">
+                                        <i className="fa-solid fa-user-doctor text-indigo-400 text-lg"></i>
+                                        <span className="text-xs sm:text-sm font-semibold text-slate-300">Seleccionar Fisioterapeuta:</span>
+                                    </div>
+                                    <select
+                                        value={fisioSeleccionado}
+                                        onChange={e => setFisioSeleccionado(e.target.value)}
+                                        className="w-full sm:w-auto bg-slate-900 border border-slate-700 text-white font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        {FISIOTERAPEUTAS.map(f => (
+                                            <option key={f} value={f}>{f}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-x-auto shadow-2xl max-h-[70vh]">
+                                    <table className="w-full text-left border-collapse min-w-[650px]">
+                                        <thead className="sticky top-0 z-20 bg-slate-900 border-b border-slate-700 text-xs">
+                                            <tr>
+                                                <th className="p-2.5 font-bold w-20 text-center border-r border-slate-700 sticky left-0 bg-slate-900 z-30">Hora (15m)</th>
+                                                {DIAS.map(d => (
+                                                    <th key={d} className="p-2.5 font-bold text-center border-r border-slate-700/50 last:border-0">
+                                                        {d}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/30 text-xs">
+                                            {(() => {
+                                                const skipMapDia = {};
+                                                DIAS.forEach(d => { skipMapDia[d] = 0; });
+
+                                                return HORARIOS_15MIN.map(hora => (
+                                                    <tr key={hora} className="hover:bg-slate-700/20">
+                                                        <td className="p-1.5 text-center font-bold text-slate-400 border-r border-b border-slate-700 bg-slate-900/50 sticky left-0 z-10 text-[11px]">
+                                                            {hora}
+                                                        </td>
+                                                        {DIAS.map(dia => {
+                                                            if (skipMapDia[dia] > 0) {
+                                                                skipMapDia[dia]--;
+                                                                return null;
+                                                            }
+
+                                                            const key = `${fisioSeleccionado}_${dia}_${hora}`;
+                                                            const s = sesiones[key];
+
+                                                            let span = 1;
+                                                            let bg = "bg-slate-900/30 text-slate-500 cursor-pointer hover:bg-slate-700/40 border-b border-slate-800/40";
+                                                            let label = "+";
+
+                                                            if (s) {
+                                                                const dur = s.duracion || 45;
+                                                                span = Math.max(1, Math.round(dur / 15));
+                                                                skipMapDia[dia] = span - 1;
+
+                                                                if (s.tipo === "COORDINACION") {
+                                                                    bg = "bg-purple-950/90 border border-purple-500/50 text-purple-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "PISCINA") {
+                                                                    bg = "bg-cyan-950/90 border border-cyan-500/60 text-cyan-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "RESPI") {
+                                                                    bg = "bg-teal-950/90 border border-teal-500/60 text-teal-200 font-bold shadow-inner";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "DESAYUNO") {
+                                                                    bg = "bg-slate-800/80 text-slate-400 italic text-[10px]";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "DESAHABILITADO") {
+                                                                    bg = "bg-slate-950/90 text-slate-600";
+                                                                    label = s.label;
+                                                                } else if (s.tipo === "INDIVIDUAL") {
+                                                                    bg = "bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 font-bold cursor-pointer hover:bg-emerald-900/80 shadow-inner";
+                                                                    label = s.alumno;
+                                                                }
+                                                            }
+
+                                                            return (
+                                                                <td
+                                                                    key={key}
+                                                                    rowSpan={span}
+                                                                    onClick={() => abrirModalAsignacion(fisioSeleccionado, dia, hora)}
+                                                                    className={`p-2 text-center border-r border-b border-slate-700/40 align-middle transition-all text-[11px] ${bg}`}
+                                                                >
+                                                                    <div className="flex flex-col items-center justify-center h-full gap-0.5 min-h-[32px]">
+                                                                        <span className="truncate max-w-[120px]" title={label}>
+                                                                            {label}
+                                                                        </span>
+                                                                        {s && s.tipo === "INDIVIDUAL" && (
+                                                                            <span className="text-[9px] text-emerald-400/80 font-normal">
+                                                                                (45 min)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ));
+                                            })()}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Vista por Alumno */}
+                        {vistaActual === "alumno" && (
+                            <div className="space-y-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700">
+                                    <div className="flex items-center gap-3">
+                                        <i className="fa-solid fa-user-graduate text-indigo-400 text-lg"></i>
+                                        <span className="text-xs sm:text-sm font-semibold text-slate-300">Seleccionar Alumno:</span>
+                                    </div>
+                                    <select
+                                        value={alumnoSeleccionado}
+                                        onChange={e => setAlumnoSeleccionado(e.target.value)}
+                                        className="w-full sm:w-auto bg-slate-900 border border-slate-700 text-white font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        {catalogoAlumnos.map(a => (
+                                            <option key={a.id} value={a.nombre}>{a.nombre} ({a.centro})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {(() => {
+                                    const alumObj = catalogoAlumnos.find(a => a.nombre === alumnoSeleccionado);
+                                    if (!alumObj) return null;
+
+                                    return (
+                                        <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 space-y-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 pb-3">
+                                                <div>
+                                                    <h3 className="text-sm sm:text-base font-bold text-white">{alumObj.nombre}</h3>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                                                        <span className="bg-slate-700 text-indigo-300 px-2 py-0.5 rounded font-bold">{alumObj.centro}</span>
+                                                        <span className="text-slate-300">Cuota: <strong className="text-white">{alumObj.cuota} sesiones/sem</strong></span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                    <div className="bg-indigo-950/80 border border-indigo-500/50 px-3 py-1 rounded-xl text-indigo-200">
+                                                        <i className="fa-solid fa-user-doctor text-indigo-400 mr-1.5"></i>
+                                                        Principal: <strong>{alumObj.fisioResponsable || "No asignado"}</strong>
+                                                    </div>
+                                                    <div className="bg-slate-900 border border-slate-700 px-3 py-1 rounded-xl text-slate-300">
+                                                        <i className="fa-solid fa-user-shield text-slate-400 mr-1.5"></i>
+                                                        Secundario: <strong>{alumObj.fisioSecundario || "No asignado"}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-xs text-slate-300">
+                                                <i className="fa-solid fa-circle-info text-indigo-400 mr-1.5"></i>
+                                                {alumObj.observaciones}
+                                            </div>
+
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse text-xs">
+                                                    <thead>
+                                                        <tr className="bg-slate-900 text-slate-300 border-b border-slate-700">
+                                                            <th className="p-2.5 font-bold">Día</th>
+                                                            <th className="p-2.5 font-bold">Fisioterapia (Semana {semana})</th>
+                                                            <th className="p-2.5 font-bold">Otras Disciplinas (Logopedia / TO)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-700/40">
+                                                        {DIAS.map(dia => {
+                                                            const fisiosDia = Object.entries(sesiones).filter(([k, v]) => {
+                                                                const [f, d_k, h_k] = k.split('_');
+                                                                return d_k === dia && v.alumno === alumObj.nombre;
+                                                            }).map(([k, v]) => {
+                                                                const [f, d_k, h_k] = k.split('_');
+                                                                return { fisio: f, hora: h_k, tipo: v.tipo, label: v.label, horaAgua: v.horaAgua };
+                                                            });
+
+                                                            const disciplinasDia = HORARIOS_OTRAS_DISCIPLINAS.filter(
+                                                                o => o.alumno === alumObj.nombre && o.dia === dia
+                                                            );
+
+                                                            return (
+                                                                <tr key={dia} className="hover:bg-slate-700/20">
+                                                                    <td className="p-2.5 font-bold text-slate-300">{dia}</td>
+                                                                    <td className="p-2.5">
+                                                                        {fisiosDia.length === 0 ? (
+                                                                            <span className="text-slate-500 italic">Sin sesión asignada</span>
+                                                                        ) : (
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {fisiosDia.map((fd, idx) => (
+                                                                                    <span key={idx} className={`px-2.5 py-1 rounded-lg font-semibold border text-xs ${
+                                                                                        fd.tipo === 'PISCINA' ? 'bg-cyan-950/80 border-cyan-500 text-cyan-200' : 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
+                                                                                    }`}>
+                                                                                        {fd.hora} h - {fd.label} (Fisio: {fd.fisio}) {fd.horaAgua ? `[Agua: ${fd.horaAgua}]` : ''}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-2.5">
+                                                                        {disciplinasDia.length === 0 ? (
+                                                                            <span className="text-slate-500 italic">Libre</span>
+                                                                        ) : (
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {disciplinasDia.map((dd, idx) => (
+                                                                                    <span key={idx} className="px-2.5 py-1 rounded-lg font-semibold bg-purple-950/80 border border-purple-500 text-purple-200 text-xs">
+                                                                                        {dd.hora} h - {dd.disciplina}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {/* Vista Horario Real Piscina */}
+                        {vistaActual === "piscina" && (
+                            <div className="space-y-4">
+                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <i className="fa-solid fa-water text-cyan-400 text-xl"></i>
+                                        <div>
+                                            <h2 className="text-sm font-bold text-white">Planing General Real de Piscina (Semana {semana})</h2>
+                                            <p className="text-xs text-slate-400">Desglose exacto con franjas escalonadas de vestuario, agua y regreso al aula.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setSemana("1")}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${semana === "1" ? "bg-cyan-500 text-slate-950" : "bg-slate-900 text-slate-400"}`}
+                                        >
+                                            Semana 1
+                                        </button>
+                                        <button
+                                            onClick={() => setSemana("2")}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold ${semana === "2" ? "bg-cyan-500 text-slate-950" : "bg-slate-900 text-slate-400"}`}
+                                        >
+                                            Semana 2
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-x-auto shadow-2xl">
+                                    <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+                                        <thead>
+                                            <tr className="bg-slate-900 text-slate-300 border-b border-slate-700">
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">Turno</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">Entrada Vestuario</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700 bg-cyan-950/60 text-cyan-300">ENTRADA AGUA</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">LUNES</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">MARTES</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">MIÉRCOLES</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700">JUEVES</th>
+                                                <th className="p-2.5 font-bold text-center border-r border-slate-700 bg-cyan-950/60 text-cyan-300">SALIDA AGUA</th>
+                                                <th className="p-2.5 font-bold text-center">Llegada Aula</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700/40">
+                                            {DETALLE_PISCINA_HORARIOS.map((det, idx) => {
+                                                return (
+                                                    <tr key={idx} className="hover:bg-slate-700/20">
+                                                        <td className="p-2 text-center font-bold text-slate-400 border-r border-slate-700">{det.turno}</td>
+                                                        <td className="p-2 text-center text-slate-300 border-r border-slate-700">{det.vestuarioEntrada}</td>
+                                                        <td className="p-2 text-center font-bold text-cyan-400 border-r border-slate-700 bg-cyan-950/30">{det.aguaEntrada}</td>
+                                                        
+                                                        <td className="p-2 border-r border-slate-700 text-center font-semibold text-cyan-200">
+                                                            {idx === 0 ? "KIKE (Noe)" : idx === 1 ? "PABLO (Sandra)" : idx === 2 ? "NICOLÁS GALLEGO (Noe)" : idx === 3 ? "GONZALO (Sandra)" : "-"}
+                                                        </td>
+
+                                                        <td className="p-2 border-r border-slate-700 text-center font-semibold text-cyan-200">
+                                                            {idx === 0 ? (semana === "1" ? "INÉS (Berta)" : "COCO (Berta)") : idx === 2 ? (semana === "1" ? "LARRAURI (Berta)" : "JULIA (Berta)") : "-"}
+                                                        </td>
+
+                                                        <td className="p-2 border-r border-slate-700 text-center font-semibold text-cyan-200">
+                                                            {idx === 0 ? (semana === "1" ? "EMMA (Violeta)" : "CARLOS GIL (Violeta)") : idx === 2 ? (semana === "1" ? "CATALEYA (Violeta)" : "TONI (Violeta)") : "-"}
+                                                        </td>
+
+                                                        <td className="p-2 border-r border-slate-700 text-center font-semibold text-cyan-200">
+                                                            {idx === 0 ? (semana === "1" ? "ITZIAR (Esther)" : "IRENE (Esther)") : idx === 2 ? (semana === "1" ? "CARMEN (Esther)" : "BELÉN (Esther)") : "-"}
+                                                        </td>
+
+                                                        <td className="p-2 text-center font-bold text-cyan-400 border-r border-slate-700 bg-cyan-950/30">{det.aguaSalida}</td>
+                                                        <td className="p-2 text-center text-slate-300">{det.aulaLlegada}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Directivos Alumnos & Cuotas */}
+                        {vistaActual === "alumnos" && (
+                            <div className="space-y-4">
+                                <div className="flex flex-col sm:flex-row justify-between gap-3 bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700">
+                                    <div className="flex-1 relative">
+                                        <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar alumno por nombre..."
+                                            value={alumnoBuscado}
+                                            onChange={e => setAlumnoBuscado(e.target.value)}
+                                            className="w-full bg-slate-900 border border-slate-700 pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-400">Centro:</span>
+                                        <select
+                                            value={filtroCentro}
+                                            onChange={e => setFiltroCentro(e.target.value)}
+                                            className="bg-slate-900 border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        >
+                                            <option value="TODOS">Todos los centros</option>
+                                            <option value="CEE">CEE</option>
+                                            <option value="CDR">CDR</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {catalogoAlumnos.filter(a => {
+                                        const coincideNombre = a.nombre.toLowerCase().includes(alumnoBuscado.toLowerCase());
+                                        const coincideCentro = filtroCentro === "TODOS" || a.centro === filtroCentro;
+                                        return coincideNombre && coincideCentro;
+                                    }).map(alumno => {
+                                        const asignadas = Object.values(sesiones).filter(s => s.alumno === alumno.nombre).length;
+                                        const completado = asignadas >= alumno.cuota;
+
+                                        return (
+                                            <div key={alumno.id} className="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div>
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-700 text-indigo-300">
+                                                            {alumno.centro}
+                                                        </span>
+                                                        <h3 className="font-bold text-white text-xs sm:text-sm mt-1">{alumno.nombre}</h3>
+                                                    </div>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                                                        completado ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                    }`}>
+                                                        {asignadas} / {alumno.cuota} sesiones
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-xs">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-400 font-semibold block mb-1">Fisio Principal:</label>
+                                                        <select
+                                                            value={alumno.fisioResponsable || ""}
+                                                            onChange={e => actualizarFisioResponsable(alumno.id, 'fisioResponsable', e.target.value)}
+                                                            className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-1 text-[11px] outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        >
+                                                            {FISIOTERAPEUTAS.map(f => (
+                                                                <option key={f} value={f}>{f}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-400 font-semibold block mb-1">Fisio Secundario:</label>
+                                                        <select
+                                                            value={alumno.fisioSecundario || ""}
+                                                            onChange={e => actualizarFisioResponsable(alumno.id, 'fisioSecundario', e.target.value)}
+                                                            className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-1 text-[11px] outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        >
+                                                            {FISIOTERAPEUTAS.map(f => (
+                                                                <option key={f} value={f}>{f}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <p className="text-xs text-slate-400 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/80 leading-relaxed">
+                                                    <i className="fa-solid fa-circle-info text-indigo-400 mr-1.5"></i>
+                                                    {alumno.observaciones}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Vista Auditoría */}
+                        {vistaActual === "auditoria" && (
+                            <div className="space-y-4">
+                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xl"></i>
+                                        <div>
+                                            <h2 className="text-sm font-bold text-white">Informe de Validación e Integración</h2>
+                                            <p className="text-xs text-slate-400">Comprobación de cuotas e incompatibilidades con Logopedia/TO.</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">
+                                        {auditoria.length} Registros
+                                    </span>
+                                </div>
+
+                                {auditoria.length === 0 ? (
+                                    <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-8 text-center space-y-3">
+                                        <i className="fa-solid fa-circle-check text-4xl text-emerald-400"></i>
+                                        <h3 className="text-base font-bold text-emerald-200">¡Cuadrante Validado con Éxito!</h3>
+                                        <p className="text-xs text-emerald-300/80 max-w-md mx-auto">
+                                            Todos los alumnos disponen de sus sesiones completadas y no existe ningún solapamiento horario.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {auditoria.map((aviso, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+                                                    aviso.tipo === 'solapamiento'
+                                                        ? 'bg-rose-950/60 border-rose-500/50 text-rose-200'
+                                                        : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <i className={`fa-solid ${aviso.tipo === 'solapamiento' ? 'fa-ban text-rose-400' : 'fa-clock text-amber-400'}`}></i>
+                                                    <span className="font-medium">{aviso.mensaje}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modal Asignación */}
+                    {modalAsignacion && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+                                    <h3 className="font-bold text-white text-sm">
+                                        Asignar Sesión ({modalAsignacion.fisio} - {modalAsignacion.dia} {modalAsignacion.hora})
+                                    </h3>
+                                    <button onClick={() => setModalAsignacion(null)} className="text-slate-400 hover:text-white p-1">
+                                        <i className="fa-solid fa-xmark text-base"></i>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-xs font-semibold text-slate-300 block">Seleccionar Alumno (45 minutos):</label>
+                                    <select
+                                        id="selectAlumnoModal"
+                                        defaultValue={modalAsignacion.actual?.alumno || ""}
+                                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="">-- Hueco libre / Vaciar --</option>
+                                        {catalogoAlumnos.map(a => (
+                                            <option key={a.id} value={a.nombre}>{a.nombre} ({a.centro})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-2 justify-end border-t border-slate-700 pt-4">
+                                    <button
+                                        onClick={() => setModalAsignacion(null)}
+                                        className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-700"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const sel = document.getElementById("selectAlumnoModal");
+                                            guardarAsignacionManual(sel ? sel.value : "");
+                                        }}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

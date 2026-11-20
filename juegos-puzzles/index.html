@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Juegos Puzzles de Tati</title>
+    <!-- Tailwind para utilidades rápidas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        /* --- RESET Y ESTRUCTURA BASE --- */
+        * { box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
+        
+        body {
+            background-color: #050505;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0; padding: 0;
+            height: 100dvh; /* Altura dinámica real del móvil */
+            width: 100vw;
+            overflow: hidden;
+            display: flex; justify-content: center;
+            color: white;
+        }
+
+        #app-container {
+            width: 100%; max-width: 600px; height: 100%;
+            display: flex; flex-direction: column;
+            background: #111;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* --- 1. BARRA SUPERIOR (Score y Salir) --- */
+        #top-bar {
+            height: 60px; flex-shrink: 0;
+            background: #1f2937; border-bottom: 4px solid #374151;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; z-index: 20;
+        }
+        .score-box { display: flex; flex-direction: column; }
+        .label-text { font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
+        .value-text { font-size: 14px; color: #facc15; text-shadow: 1px 1px 0 #000; }
+        .exit-btn {
+            background: #dc2626; color: white; border: 2px solid #ef4444;
+            padding: 8px 12px; font-size: 10px; cursor: pointer; border-radius: 4px;
+            font-family: inherit;
+        }
+        .exit-btn:active { transform: scale(0.95); filter: brightness(0.8); }
+
+        /* --- 2. PANTALLA DE JUEGO --- */
+        #game-area {
+            flex: 1; /* Ocupa todo el espacio sobrante */
+            position: relative; background: #000;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; border-bottom: 4px solid #333;
+        }
+        canvas {
+            max-width: 100%; max-height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* --- 3. ZONA DE CONTROLES (Inferior) --- */
+        #controls-area {
+            /* Altura fija generosa para que quepan bien los dedos */
+            height: 260px; 
+            flex-shrink: 0;
+            background: #0a0a0a;
+            position: relative;
+            
+            /* CRUCIAL PARA ANDROID: Padding inferior extra para evitar la barra de gestos */
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            
+            display: flex; flex-direction: column; justify-content: center;
+        }
+
+        /* Layouts específicos por juego (se muestran/ocultan) */
+        .ctrl-layout { width: 100%; height: 100%; display: none; align-items: center; justify-content: center; }
+        .ctrl-layout.active { display: flex; }
+
+        /* Estilos Botones Físicos */
+        .dpad-grid {
+            display: grid;
+            grid-template-columns: 65px 65px 65px;
+            grid-template-rows: 60px 60px;
+            gap: 8px;
+            margin-right: 20px;
+        }
+        .btn-game {
+            background: #374151; border: 2px solid #4b5563; border-radius: 8px;
+            color: #9ca3af; font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 0 #1f2937; transition: transform 0.05s;
+        }
+        .btn-game:active { transform: translateY(4px); box-shadow: none; background: #4b5563; color: white; }
+        .btn-game.pressed { transform: translateY(4px); box-shadow: none; background: #4b5563; color: white; } /* Estado visual JS */
+
+        .btn-round {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: #b91c1c; border: 4px solid #ef4444;
+            color: white; font-size: 14px; box-shadow: 0 6px 0 #7f1d1d;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-round:active { transform: translateY(6px); box-shadow: none; background: #ef4444; }
+
+        /* Botón gigante para Bobble/Minas */
+        .btn-wide {
+            width: 80%; height: 80px;
+            background: #d97706; border: 4px solid #fbbf24; border-radius: 12px;
+            color: white; font-size: 20px; box-shadow: 0 6px 0 #92400e;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-wide:active { transform: translateY(6px); box-shadow: none; filter: brightness(1.1); }
+        .btn-wide.active-mode { background: #facc15; color: black; border-color: white; box-shadow: 0 0 15px #facc15; }
+
+        /* --- 4. MENÚ PRINCIPAL (Overlay) --- */
+        #main-menu {
+            position: absolute; inset: 0;
+            background: rgba(15, 23, 42, 0.98);
+            z-index: 100;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        
+        .menu-title {
+            color: #facc15; font-size: 24px; text-align: center;
+            text-shadow: 4px 4px 0 #000; margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%; max-width: 400px;
+            max-height: 70vh; overflow-y: auto;
+            padding: 5px;
+        }
+
+        /* Botones del Menú (El estilo azul bonito) */
+        .menu-card {
+            background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+            border: 2px solid #60a5fa;
+            border-radius: 12px;
+            padding: 20px 10px;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #1e3a8a;
+            transition: transform 0.1s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .menu-card:active { transform: translateY(4px); box-shadow: none; filter: brightness(1.1); }
+        
+        .card-name { color: white; font-size: 12px; margin-bottom: 5px; text-shadow: 1px 1px 0 #000; }
+        .card-score { color: #bfdbfe; font-size: 8px; }
+
+        /* Scanlines */
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 999;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+        }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div class="scanlines"></div>
+
+    <!-- 1. BARRA SUPERIOR -->
+    <div id="top-bar">
+        <div class="score-box">
+            <span class="label-text">SCORE</span>
+            <span class="value-text" id="score-display">0</span>
+        </div>
+        <div class="score-box" style="align-items: flex-end;">
+            <span class="label-text">HI-SCORE</span>
+            <span class="value-text" style="color: #60a5fa;" id="hiscore-display">0</span>
+        </div>
+        <button class="exit-btn hidden" id="exit-btn" onclick="gameManager.toMenu()">SALIR</button>
+    </div>
+
+    <!-- 2. JUEGO -->
+    <div id="game-area">
+        <canvas id="gameCanvas" width="800" height="1000"></canvas>
+    </div>
+
+    <!-- 3. CONTROLES FÍSICOS (Abajo) -->
+    <div id="controls-area">
+        
+        <!-- A: PAD CLÁSICO (Tetris, Columns) -->
+        <div id="ctrl-pad" class="ctrl-layout">
+            <div class="dpad-grid">
+                <div></div>
+                <button class="btn-game" id="btn-up">↻</button>
+                <div></div>
+                
+                <button class="btn-game" id="btn-left">←</button>
+                <button class="btn-game" id="btn-down">↓</button>
+                <button class="btn-game" id="btn-right">→</button>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                <span class="label-text">ACCIÓN</span>
+                <button class="btn-round" id="btn-action">●</button>
+            </div>
+        </div>
+
+        <!-- B: SOLO ACCIÓN (Bobble - Disparo) -->
+        <div id="ctrl-onebtn" class="ctrl-layout">
+            <button class="btn-wide" id="btn-fire" style="background:#dc2626; border-color:#fca5a5;">
+                ¡DISPARAR!
+            </button>
+        </div>
+
+        <!-- C: MINAS (Alternar Bandera) -->
+        <div id="ctrl-mines" class="ctrl-layout">
+            <button class="btn-wide" id="btn-flag" onclick="gameManager.toggleFlagMode()">
+                MODO: CAVAR
+            </button>
+        </div>
+
+        <!-- D: VACÍO (Parejas, Merge, Simon - Solo táctil en pantalla) -->
+        <div id="ctrl-touch" class="ctrl-layout">
+            <p class="label-text" style="font-size: 12px; color: #666;">TOCA LA PANTALLA PARA JUGAR</p>
+        </div>
+
+    </div>
+
+    <!-- 4. MENÚ PRINCIPAL -->
+    <div id="main-menu">
+        <div class="menu-title">JUEGOS<br>DE TATI</div>
+        <div class="menu-grid" id="menu-list">
+            <!-- Se genera por JS -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+/** * EFECTOS VISUALES 
+ */
+class Effects {
+    constructor() { this.p = []; this.f = []; }
+    explode(x, y, color, count=10) {
+        for(let i=0;i<count;i++) this.p.push({x, y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, life:1.0, c:color, s:Math.random()*5+2});
+    }
+    showText(x, y, text, color='#fff') { this.f.push({x, y, text, life:1.0, c:color, vy:-2}); }
+    update() {
+        this.p=this.p.filter(p=>{ p.x+=p.vx; p.y+=p.vy; p.life-=0.05; return p.life>0; });
+        this.f=this.f.filter(f=>{ f.y+=f.vy; f.life-=0.02; return f.life>0; });
+    }
+    draw(ctx) {
+        ctx.save();
+        this.p.forEach(p=>{ ctx.globalAlpha=p.life; ctx.fillStyle=Graphics.colors[p.c]?.inner||p.c; ctx.fillRect(p.x,p.y,p.s,p.s); });
+        ctx.font='14px "Press Start 2P"'; ctx.textAlign='center';
+        this.f.forEach(f=>{ ctx.globalAlpha=f.life; ctx.fillStyle='#000'; ctx.fillText(f.text,f.x+2,f.y+2); ctx.fillStyle=f.c; ctx.fillText(f.text,f.x,f.y); });
+        ctx.restore();
+    }
+}
+
+/**
+ * MOTOR GRÁFICO
+ */
+const Graphics = {
+    colors: {
+        'blue':   { inner: '#3b82f6', outer: '#1d4ed8' },
+        'black':  { inner: '#4b5563', outer: '#111111', border: '#9ca3af' },
+        'white':  { inner: '#ffffff', outer: '#e5e7eb', border: '#4b5563' },
+        'red':    { inner: '#ef4444', outer: '#991b1b' },
+        'green':  { inner: '#22c55e', outer: '#15803d' },
+        'yellow': { inner: '#facc15', outer: '#a16207' },
+        'brown':  { inner: '#d97706', outer: '#78350f' },
+        'violet': { inner: '#a855f7', outer: '#6b21a8' },
+        'cyan':   { inner: '#22d3ee', outer: '#0891b2' },
+        'gray':   { inner: '#9ca3af', outer: '#4b5563' }
+    },
+    colorList: ['red', 'blue', 'green', 'yellow', 'violet', 'cyan', 'white', 'black'],
+
+    drawGem: (ctx, x, y, size, colorKey, opacity = 1) => {
+        ctx.globalAlpha = opacity;
+        const cx = x + size / 2, cy = y + size / 2, r = (size / 2) - 2;
+        const c = Graphics.colors[colorKey] || Graphics.colors['gray'];
+        ctx.beginPath(); ctx.arc(cx+2, cy+2, r, 0, Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fill();
+        const grad = ctx.createRadialGradient(cx-r/3, cy-r/3, r/4, cx, cy, r);
+        grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, c.inner); grad.addColorStop(1, c.outer);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle=grad; ctx.fill();
+        ctx.lineWidth=2; ctx.strokeStyle=c.border||'rgba(0,0,0,0.3)'; ctx.stroke();
+        ctx.globalAlpha = 1;
+    },
+    drawCardBack: (ctx, x, y, w, h) => {
+        const r=8; ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+        ctx.fillStyle='#1e3a8a'; ctx.fill(); ctx.strokeStyle='#60a5fa'; ctx.lineWidth=4; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x+10,y+10); ctx.lineTo(x+w-10,y+h-10); ctx.moveTo(x+w-10,y+10); ctx.lineTo(x+10,y+h-10);
+        ctx.strokeStyle='#172554'; ctx.lineWidth=3; ctx.stroke();
+    },
+    drawMine: (ctx, x, y, size) => {
+        const cx=x+size/2, cy=y+size/2, r=size/3.5;
+        ctx.fillStyle='#1f2937'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#1f2937'; ctx.lineWidth=3;
+        for(let i=0;i<8;i++){ const a=(Math.PI*2*i)/8; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); ctx.lineTo(cx+Math.cos(a)*(r+5),cy+Math.sin(a)*(r+5)); ctx.stroke(); }
+        ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(cx-2,cy-2,3,0,Math.PI*2); ctx.fill();
+    },
+    drawFlag: (ctx, x, y, size) => {
+        const p=size*0.25; ctx.fillStyle='#e5e7eb'; ctx.fillRect(x+size*0.35, y+p, 3, size-p*2);
+        ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(x+size*0.35+3, y+p); ctx.lineTo(x+size*0.9, y+p+size*0.2); ctx.lineTo(x+size*0.35+3, y+p+size*0.4); ctx.fill();
+    }
+};
+
+/**
+ * GESTOR DE ENTRADA
+ */
+class InputHandler {
+    constructor() {
+        this.keys = {};
+        this.mouse = { x: 0, y: 0, clicked: false, rightClicked: false, down: false };
+        this.flagMode = false;
+        this.lastSource = 'mouse';
+        
+        window.addEventListener('keydown', e => { this.keys[e.code] = true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); });
+        window.addEventListener('keyup', e => this.keys[e.code] = false);
+        
+        const cvs = document.getElementById('gameCanvas');
+        const getPos = (cx, cy) => {
+            const r = cvs.getBoundingClientRect();
+            return { x: (cx - r.left) * (cvs.width / r.width), y: (cy - r.top) * (cvs.height / r.height) };
+        };
+
+        const move = (x, y, src) => { this.lastSource = src; const p = getPos(x, y); this.mouse.x = p.x; this.mouse.y = p.y; };
+        const start = (btn, src) => { 
+            this.lastSource = src; this.mouse.down = true; 
+            if(btn===0 || btn===undefined) this.mouse.clicked = true; 
+            if(btn===2 || (btn===undefined && this.flagMode)) this.mouse.rightClicked = true; 
+        };
+        const end = () => { this.mouse.down = false; this.mouse.clicked = false; this.mouse.rightClicked = false; };
+
+        cvs.addEventListener('mousemove', e => move(e.clientX, e.clientY, 'mouse'));
+        cvs.addEventListener('mousedown', e => { move(e.clientX, e.clientY, 'mouse'); start(e.button, 'mouse'); });
+        cvs.addEventListener('mouseup', end);
+        
+        cvs.addEventListener('touchmove', e => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY, 'touch'); }, {passive:false});
+        // En touchstart NO activamos click inmediato para evitar disparos accidentales en Bobble
+        // El juego específico decidirá si usa mouse.down o espera a un tap limpio
+        cvs.addEventListener('touchstart', e => { 
+            e.preventDefault(); 
+            const t=e.touches[0]; move(t.clientX, t.clientY, 'touch'); 
+            start(undefined, 'touch'); 
+        }, {passive:false});
+        cvs.addEventListener('touchend', e => { e.preventDefault(); end(); });
+        cvs.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Mapeo botones
+        this.bindBtn('btn-left', 'ArrowLeft'); this.bindBtn('btn-right', 'ArrowRight');
+        this.bindBtn('btn-up', 'ArrowUp'); this.bindBtn('btn-down', 'ArrowDown');
+        this.bindBtn('btn-action', 'Space'); this.bindBtn('btn-fire', 'Space');
+    }
+
+    bindBtn(id, code) {
+        const btn = document.getElementById(id); if(!btn) return;
+        const down = (e) => { e.preventDefault(); this.keys[code] = true; btn.classList.add('pressed'); };
+        const up = (e) => { e.preventDefault(); this.keys[code] = false; btn.classList.remove('pressed'); };
+        btn.addEventListener('mousedown', down); btn.addEventListener('mouseup', up);
+        btn.addEventListener('touchstart', down, {passive:false}); btn.addEventListener('touchend', up);
+        btn.addEventListener('mouseleave', up);
+    }
+
+    toggleFlagMode() { this.flagMode = !this.flagMode; return this.flagMode; }
+    isPressed(c) { if(this.keys[c] && !this.keys[c+'_l']) { this.keys[c+'_l']=true; return true; } if(!this.keys[c]) this.keys[c+'_l']=false; return false; }
+    isDown(c) { return this.keys[c]; }
+    getClick() { if(this.mouse.clicked) { this.mouse.clicked = false; return {x:this.mouse.x, y:this.mouse.y, type:'left'}; } if(this.mouse.rightClicked) { this.mouse.rightClicked = false; return {x:this.mouse.x, y:this.mouse.y, type:'right'}; } return null; }
+}
+
+// --- JUEGOS ---
+
+class TetrisGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0;
+        this.cols=10; this.rows=20; this.cellSize=35;
+        this.ox=(w-this.cols*this.cellSize)/2 - 40; this.oy=40;
+        this.board=Array(this.rows).fill().map(()=>Array(this.cols).fill(0));
+        this.shapes={'I':[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],'O':[[1,1],[1,1]],'T':[[0,1,0],[1,1,1],[0,0,0]],'S':[[0,1,1],[1,1,0],[0,0,0]],'Z':[[1,1,0],[0,1,1],[0,0,0]],'J':[[1,0,0],[1,1,1],[0,0,0]],'L':[[0,0,1],[1,1,1],[0,0,0]]};
+        this.dropTimer=0; this.genNext(); this.reset();
+    }
+    genNext() { this.nextK = Object.keys(this.shapes)[Math.floor(Math.random()*7)]; }
+    reset() {
+        if(!this.nextK) this.genNext(); const k=this.nextK; this.genNext();
+        this.piece={ m:this.shapes[k], p:{x:(this.cols/2|0)-2, y:0}, c:'blue' };
+        if(this.collide(this.board, this.piece)) this.over=true;
+    }
+    rotate(m) { const N=m.length-1; return m.map((r,i)=>r.map((v,j)=>m[N-j][i])); }
+    collide(b, p) { for(let y=0;y<p.m.length;++y) for(let x=0;x<p.m[y].length;++x) if(p.m[y][x] && (b[y+p.p.y] && b[y+p.p.y][x+p.p.x])!==0) return true; return false; }
+    merge(b, p) { p.m.forEach((r,y)=> r.forEach((v,x)=> { if(v && b[y+p.p.y]) b[y+p.p.y][x+p.p.x]=p.c; })); }
+    sweep() {
+        let rc=1; outer: for(let y=this.board.length-1; y>0; --y) {
+            for(let x=0; x<this.cols; ++x) if(this.board[y][x]===0) continue outer;
+            this.board.splice(y,1)[0].fill(0); this.board.unshift(new Array(this.cols).fill(0));
+            this.fx.explode(this.ox+this.cols*this.cellSize/2, this.oy+y*this.cellSize, 'white', 20);
+            this.fx.showText(this.ox+this.cols*this.cellSize/2, this.oy+y*this.cellSize, `+${rc*100}`);
+            ++y; this.score+=rc*100; rc*=2;
+        }
+    }
+    update(dt, inp) {
+        if(this.over) return;
+        if(inp.isPressed('ArrowLeft')) { this.piece.p.x--; if(this.collide(this.board, this.piece)) this.piece.p.x++; }
+        if(inp.isPressed('ArrowRight')) { this.piece.p.x++; if(this.collide(this.board, this.piece)) this.piece.p.x--; }
+        if(inp.isPressed('ArrowUp') || inp.isPressed('Space')) { const r=this.rotate(this.piece.m); const o=this.piece.m; this.piece.m=r; if(this.collide(this.board, this.piece)) this.piece.m=o; }
+        this.dropTimer+=dt;
+        if(this.dropTimer > (inp.isDown('ArrowDown')?50:800)) {
+            this.piece.p.y++;
+            if(this.collide(this.board, this.piece)) { this.piece.p.y--; this.merge(this.board, this.piece); this.reset(); this.sweep(); }
+            this.dropTimer=0;
+        }
+    }
+    draw() {
+        this.ctx.fillStyle='#111'; this.ctx.fillRect(this.ox,this.oy,this.cols*this.cellSize,this.rows*this.cellSize);
+        this.ctx.strokeStyle='#333'; this.ctx.lineWidth=2; this.ctx.strokeRect(this.ox,this.oy,this.cols*this.cellSize,this.rows*this.cellSize);
+        this.board.forEach((r,y)=>r.forEach((v,x)=>{ if(v) Graphics.drawGem(this.ctx,this.ox+x*this.cellSize,this.oy+y*this.cellSize,this.cellSize,v); }));
+        if(this.piece) this.piece.m.forEach((r,y)=>r.forEach((v,x)=>{ if(v) Graphics.drawGem(this.ctx,this.ox+(x+this.piece.p.x)*this.cellSize,this.oy+(y+this.piece.p.y)*this.cellSize,this.cellSize,this.piece.c); }));
+        const nx=this.ox+this.cols*this.cellSize+15;
+        this.ctx.fillStyle='#000'; this.ctx.fillRect(nx,this.oy,80,80); this.ctx.strokeRect(nx,this.oy,80,80);
+        if(this.nextK) this.shapes[this.nextK].forEach((r,y)=>r.forEach((v,x)=>{ if(v) Graphics.drawGem(this.ctx,nx+5+x*15,this.oy+10+y*15,15,'blue'); }));
+    }
+}
+
+class ColumnsGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.cols=6; this.rows=13; this.cellSize=45;
+        this.ox=(w-this.cols*this.cellSize)/2 - 50; this.oy=40;
+        this.board=Array(this.rows).fill().map(()=>Array(this.cols).fill(null));
+        this.colors=['red','green','yellow','violet','blue','white'];
+        this.dropTimer=0; this.genNext(); this.create();
+    }
+    genNext() { this.next=[0,0,0].map(()=>this.colors[Math.floor(Math.random()*this.colors.length)]); }
+    create() { this.piece={x:3,y:-3,gems:[...this.next]}; this.genNext(); if(this.board[0][3]) this.over=true; }
+    rotate() { this.piece.gems.unshift(this.piece.gems.pop()); }
+    valid(nx,ny) { if(nx<0||nx>=this.cols) return false; for(let i=0;i<3;i++){ let r=ny+i; if(r>=this.rows) return false; if(r>=0 && this.board[r][nx]) return false; } return true; }
+    lock() { for(let i=0;i<3;i++){ let r=this.piece.y+i; if(r>=0) this.board[r][this.piece.x]=this.piece.gems[i]; } this.check(); }
+    check() {
+        let m=false, rem=Array(this.rows).fill().map(()=>Array(this.cols).fill(false));
+        const scan=(r,c,dr,dc)=>{ let col=this.board[r][c]; if(!col)return; let n=0,k=0; while(r+k*dr>=0&&r+k*dr<this.rows&&c+k*dc>=0&&c+k*dc<this.cols&&this.board[r+k*dr][c+k*dc]===col){n++;k++;} if(n>=3){for(let i=0;i<n;i++)rem[r+i*dr][c+i*dc]=true;m=true;} };
+        for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) { scan(r,c,1,0);scan(r,c,0,1);scan(r,c,1,1);scan(r,c,1,-1); }
+        if(m) {
+            let n=0; for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) if(rem[r][c]) { this.fx.explode(this.ox+c*this.cellSize+22, this.oy+r*this.cellSize+22, this.board[r][c], 5); this.board[r][c]=null; n++; }
+            this.fx.showText(this.w/2, this.h/2, `+${n*50}`); this.score+=n*50; setTimeout(()=>this.gravity(),200);
+        } else this.create();
+    }
+    gravity() { for(let c=0;c<this.cols;c++) { let w=this.rows-1; for(let r=this.rows-1;r>=0;r--) if(this.board[r][c]) { this.board[w][c]=this.board[r][c]; if(w!==r) this.board[r][c]=null; w--; } } setTimeout(()=>this.check(),200); }
+    update(dt, inp) {
+        if(this.over) return;
+        if(inp.isPressed('ArrowLeft') && this.valid(this.piece.x-1,this.piece.y)) this.piece.x--;
+        if(inp.isPressed('ArrowRight') && this.valid(this.piece.x+1,this.piece.y)) this.piece.x++;
+        if(inp.isPressed('ArrowUp') || inp.isPressed('Space')) this.rotate();
+        this.dropTimer+=dt; if(this.dropTimer>(inp.isDown('ArrowDown')?50:800)) { if(this.valid(this.piece.x,this.piece.y+1)) this.piece.y++; else this.lock(); this.dropTimer=0; }
+    }
+    draw() {
+        this.ctx.fillStyle='#111'; this.ctx.fillRect(this.ox,this.oy,this.cols*this.cellSize,this.rows*this.cellSize);
+        this.ctx.strokeStyle='#333'; this.ctx.strokeRect(this.ox,this.oy,this.cols*this.cellSize,this.rows*this.cellSize);
+        for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) if(this.board[r][c]) Graphics.drawGem(this.ctx,this.ox+c*this.cellSize,this.oy+r*this.cellSize,this.cellSize,this.board[r][c]);
+        if(this.piece) for(let i=0;i<3;i++) { let py=this.piece.y+i; if(py>=0) Graphics.drawGem(this.ctx,this.ox+this.piece.x*this.cellSize,this.oy+py*this.cellSize,this.cellSize,this.piece.gems[i]); }
+        const nx=this.ox+this.cols*this.cellSize+15;
+        this.ctx.fillStyle='#000'; this.ctx.fillRect(nx,this.oy,60,130); this.ctx.strokeRect(nx,this.oy,60,130);
+        if(this.next) for(let i=0;i<3;i++) Graphics.drawGem(this.ctx,nx+10,this.oy+10+i*40,40,this.next[i]);
+    }
+}
+
+class MinesweeperGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.cellSize=55; this.cols=9; this.rows=14;
+        this.ox=(w-this.cols*this.cellSize)/2; this.oy=(h-this.rows*this.cellSize)/2;
+        this.grid=[]; for(let y=0;y<this.rows;y++){ let r=[]; for(let x=0;x<this.cols;x++) r.push({mine:false,rev:false,flag:false,n:0}); this.grid.push(r); }
+        this.first=true;
+    }
+    place(sx,sy) {
+        let n=0; while(n<20) { const rx=Math.floor(Math.random()*this.cols), ry=Math.floor(Math.random()*this.rows); if((Math.abs(rx-sx)<=1&&Math.abs(ry-sy)<=1)||this.grid[ry][rx].mine) continue; this.grid[ry][rx].mine=true; n++; }
+        for(let y=0;y<this.rows;y++) for(let x=0;x<this.cols;x++) if(!this.grid[y][x].mine) { let c=0; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(y+dy>=0&&y+dy<this.rows&&x+dx>=0&&x+dx<this.cols&&this.grid[y+dy][x+dx].mine) c++; this.grid[y][x].n=c; }
+    }
+    reveal(x,y) {
+        if(x<0||x>=this.cols||y<0||y>=this.rows||this.grid[y][x].rev||this.grid[y][x].flag) return;
+        this.grid[y][x].rev=true; const cx=this.ox+x*this.cellSize+27, cy=this.oy+y*this.cellSize+27;
+        if(this.grid[y][x].mine) { this.over=true; this.fx.explode(cx,cy,'red',20); this.grid.forEach(r=>r.forEach(c=>c.rev=true)); return; }
+        this.fx.showText(cx,cy,"+10","#22c55e"); this.score+=10;
+        if(this.grid[y][x].n===0) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) this.reveal(x+dx,y+dy);
+    }
+    update(dt, inp) {
+        if(this.over) return; const c=inp.getClick();
+        if(c) {
+            const gx=Math.floor((c.x-this.ox)/this.cellSize), gy=Math.floor((c.y-this.oy)/this.cellSize);
+            if(gx>=0&&gx<this.cols&&gy>=0&&gy<this.rows) {
+                if(c.type==='left') { if(this.first) { this.place(gx,gy); this.first=false; } this.reveal(gx,gy); }
+                else if(c.type==='right') { if(!this.grid[gy][gx].rev) this.grid[gy][gx].flag=!this.grid[gy][gx].flag; }
+            }
+        }
+    }
+    draw() {
+        this.ctx.fillStyle='#111'; this.ctx.fillRect(this.ox-5,this.oy-5,this.cols*this.cellSize+10,this.rows*this.cellSize+10);
+        for(let y=0;y<this.rows;y++) for(let x=0;x<this.cols;x++) {
+            const c=this.grid[y][x], dx=this.ox+x*this.cellSize, dy=this.oy+y*this.cellSize;
+            if(!c.rev) {
+                this.ctx.fillStyle='#4b5563'; this.ctx.fillRect(dx,dy,this.cellSize,this.cellSize);
+                this.ctx.fillStyle='#6b7280'; this.ctx.beginPath(); this.ctx.moveTo(dx,dy+this.cellSize); this.ctx.lineTo(dx,dy); this.ctx.lineTo(dx+this.cellSize,dy); this.ctx.fill();
+                this.ctx.fillStyle='#374151'; this.ctx.beginPath(); this.ctx.moveTo(dx+this.cellSize,dy); this.ctx.lineTo(dx+this.cellSize,dy+this.cellSize); this.ctx.lineTo(dx,dy+this.cellSize); this.ctx.fill();
+                this.ctx.fillStyle='#4b5563'; this.ctx.fillRect(dx+4,dy+4,this.cellSize-8,this.cellSize-8);
+                if(c.flag) Graphics.drawFlag(this.ctx,dx+4,dy+4,this.cellSize-8);
+            } else {
+                this.ctx.fillStyle='#e5e7eb'; this.ctx.fillRect(dx,dy,this.cellSize,this.cellSize);
+                this.ctx.strokeStyle='#d1d5db'; this.ctx.strokeRect(dx,dy,this.cellSize,this.cellSize);
+                if(c.mine) Graphics.drawMine(this.ctx,dx,dy,this.cellSize);
+                else if(c.n>0) { this.ctx.fillStyle=['','blue','green','red','purple','maroon','turquoise','black','gray'][c.n]; this.ctx.font=`bold ${this.cellSize/1.5}px monospace`; this.ctx.textAlign='center'; this.ctx.textBaseline='middle'; this.ctx.fillText(c.n,dx+this.cellSize/2,dy+this.cellSize/2); }
+            }
+        }
+    }
+}
+
+class BobbleGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.radius=25; this.cols=8; this.rows=12;
+        this.ox=(w-this.cols*this.radius*2)/2; this.oy=50;
+        this.grid=[]; for(let r=0;r<this.rows;r++) { let rw=[]; for(let c=0;c<this.cols;c++) { if(r<5) rw.push({c:Graphics.colorList[Math.floor(Math.random()*Graphics.colorList.length)],a:true}); else rw.push({c:null,a:false}); } this.grid.push(rw); }
+        this.angle=-Math.PI/2; this.cur=Graphics.colorList[Math.floor(Math.random()*Graphics.colorList.length)]; this.next=Graphics.colorList[Math.floor(Math.random()*Graphics.colorList.length)]; this.proj=null;
+    }
+    update(dt, inp) {
+        if(this.over) return;
+        if(inp.mouse.down && inp.mouse.y < this.h - 100) { const dx=inp.mouse.x-this.w/2, dy=inp.mouse.y-(this.h-100); if(dy<0) this.angle=Math.atan2(dy,dx); }
+        const click = inp.getClick(); const mouseFire = (click && click.type === 'left' && inp.lastSource === 'mouse');
+        if((inp.isPressed('Space') || mouseFire) && !this.proj) {
+            this.proj={x:this.w/2,y:this.h-100,vx:Math.cos(this.angle)*20,vy:Math.sin(this.angle)*20,c:this.cur};
+            this.cur=this.next; this.next=Graphics.colorList[Math.floor(Math.random()*Graphics.colorList.length)];
+        }
+        if(this.proj) {
+            this.proj.x+=this.proj.vx; this.proj.y+=this.proj.vy;
+            if(this.proj.x<this.ox+this.radius || this.proj.x>this.ox+this.cols*this.radius*2-this.radius) this.proj.vx*=-1;
+            if(this.proj.y<this.oy) this.snap();
+            else { for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) if(this.grid[r][c].a) { let bx=this.ox+c*this.radius*2+(r%2?this.radius:0), by=this.oy+r*this.radius*2; if(Math.hypot(this.proj.x-bx, this.proj.y-by) < this.radius*1.8) { this.snap(); return; } } }
+        }
+    }
+    snap() {
+        let br=-1, bc=-1, min=9999;
+        for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) if(!this.grid[r][c].a) { let bx=this.ox+c*this.radius*2+(r%2?this.radius:0), by=this.oy+r*this.radius*2; let d=Math.hypot(this.proj.x-bx, this.proj.y-by); if(d<min){min=d;br=r;bc=c;} }
+        if(br!==-1) { this.grid[br][bc]={c:this.proj.c,a:true}; this.check(br,bc,this.proj.c); if(br>=this.rows-2) this.over=true; } this.proj=null;
+    }
+    check(r,c,color) {
+        let m=[], q=[{r,c}], v=new Set();
+        while(q.length) {
+            let n=q.pop(), k=`${n.r},${n.c}`; if(v.has(k)) continue; v.add(k);
+            if(this.grid[n.r][n.c].a && this.grid[n.r][n.c].c===color) { m.push(n); let ds=[[0,1],[0,-1],[1,0],[-1,0]]; if(n.r%2===0) ds.push([1,-1],[-1,-1]); else ds.push([1,1],[-1,1]); ds.forEach(d=>{ let nr=n.r+d[0], nc=n.c+d[1]; if(nr>=0&&nr<this.rows&&nc>=0&&nc<this.cols) q.push({r:nr,c:nc}); }); }
+        }
+        if(m.length>=3) { m.forEach(x=>{ let bx=this.ox+x.c*this.radius*2+(x.r%2?this.radius:0), by=this.oy+x.r*this.radius*2; this.fx.explode(bx, by, this.grid[x.r][x.c].c, 5); this.grid[x.r][x.c].a=false; this.score+=100; }); this.fx.showText(this.w/2, this.h/2, `+${m.length*100}`, Graphics.colors[color].inner); }
+    }
+    draw() {
+        this.ctx.fillStyle='#222'; this.ctx.fillRect(this.ox-10,this.oy,this.cols*this.radius*2+20+this.radius,this.h);
+        for(let r=0;r<this.rows;r++) for(let c=0;c<this.cols;c++) if(this.grid[r][c].a) Graphics.drawGem(this.ctx,this.ox+c*this.radius*2+(r%2?this.radius:0),this.oy+r*this.radius*2,this.radius*2,this.grid[r][c].c);
+        const cx=this.w/2, cy=this.h-100;
+        this.ctx.save(); this.ctx.beginPath(); this.ctx.strokeStyle='rgba(255,255,255,0.3)'; this.ctx.setLineDash([10,10]); this.ctx.moveTo(cx,cy); this.ctx.lineTo(cx+Math.cos(this.angle)*600,cy+Math.sin(this.angle)*600); this.ctx.stroke(); this.ctx.restore();
+        this.ctx.save(); this.ctx.translate(cx,cy); this.ctx.rotate(this.angle+Math.PI/2); this.ctx.fillStyle='#fff'; this.ctx.fillRect(-5,-60,10,60); this.ctx.restore();
+        Graphics.drawGem(this.ctx,cx-25,cy-25,50,this.cur);
+        if(this.proj) Graphics.drawGem(this.ctx,this.proj.x-25,this.proj.y-25,50,this.proj.c);
+        this.ctx.fillStyle='#fff'; this.ctx.fillText("NEXT:",50,this.h-50); Graphics.drawGem(this.ctx,120,this.h-80,50,this.next);
+    }
+}
+
+class MemoryGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.cols=4; this.rows=6; this.cw=120; this.ch=120; this.gap=15;
+        this.ox=(w-(this.cols*this.cw+(this.cols-1)*this.gap))/2; this.oy=80;
+        this.cards=[]; this.locked=false; this.flipped=[];
+        let d=[...Graphics.colorList,...Graphics.colorList,'red','blue','green','yellow','white','black','red','blue'];
+        d=d.slice(0,24).sort(()=>Math.random()-0.5);
+        for(let i=0;i<24;i++) this.cards.push({x:this.ox+(i%4)*(this.cw+this.gap), y:this.oy+Math.floor(i/4)*(this.ch+this.gap), c:d[i], s:'CLOSED'});
+    }
+    update(dt, inp) {
+        if(this.locked) return; const c=inp.getClick();
+        if(c && c.type==='left') {
+            for(let k of this.cards) if(k.s==='CLOSED' && c.x>k.x && c.x<k.x+this.cw && c.y>k.y && c.y<k.y+this.ch) {
+                k.s='OPEN'; this.flipped.push(k);
+                if(this.flipped.length===2) { this.locked=true; setTimeout(()=>this.check(),500); } break;
+            }
+        }
+    }
+    check() {
+        if(this.flipped[0].c === this.flipped[1].c) { this.flipped.forEach(k=>{k.s='MATCHED'; this.fx.explode(k.x+this.cw/2,k.y+this.ch/2,k.c,10);}); this.score+=100; this.fx.showText(this.w/2,this.h/2,"+100"); if(this.cards.every(k=>k.s==='MATCHED')) this.over=true; }
+        else this.flipped.forEach(k=>k.s='CLOSED'); this.flipped=[]; this.locked=false;
+    }
+    draw() { this.cards.forEach(k => { if(k.s==='CLOSED') Graphics.drawCardBack(this.ctx,k.x,k.y,this.cw,this.ch); else { this.ctx.fillStyle='#fff'; this.ctx.fillRect(k.x,k.y,this.cw,this.ch); Graphics.drawGem(this.ctx,k.x+10,k.y+10,this.cw-20,k.c,k.s==='MATCHED'?0.5:1); } }); }
+}
+
+class MergeGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.cols=6; this.rows=8; this.size=65; 
+        this.ox=(w-this.cols*this.size)/2; this.oy=100;
+        this.grid=[]; this.anim=false; this.drag=null;
+        for(let y=0;y<this.rows;y++) { const r=[]; for(let x=0;x<this.cols;x++) r.push(Math.floor(Math.random()*5)); this.grid.push(r); }
+    }
+    getColor(l) { return Graphics.colorList[l % Graphics.colorList.length]; }
+    update(dt, inp) {
+        if(this.anim) return;
+        if(inp.mouse.down && !this.drag) {
+            const gx=Math.floor((inp.mouse.x-this.ox)/this.size), gy=Math.floor((inp.mouse.y-this.oy)/this.size);
+            if(gx>=0&&gx<this.cols&&gy>=0&&gy<this.rows && this.grid[gy][gx]!==-1) this.drag = { gx, gy, val: this.grid[gy][gx] };
+        }
+        if(!inp.mouse.down && this.drag) {
+            const tx=Math.floor((inp.mouse.x-this.ox)/this.size), ty=Math.floor((inp.mouse.y-this.oy)/this.size);
+            if(tx>=0&&tx<this.cols&&ty>=0&&ty<this.rows && (tx!==this.drag.gx || ty!==this.drag.gy)) {
+                if(Math.abs(tx-this.drag.gx)+Math.abs(ty-this.drag.gy) === 1 && this.grid[ty][tx] === this.drag.val) {
+                    this.grid[ty][tx]++; this.grid[this.drag.gy][this.drag.gx] = -1;
+                    const pts = (this.grid[ty][tx]+1) * 50; this.score += pts;
+                    this.fx.explode(this.ox+tx*this.size+32, this.oy+ty*this.size+32, this.getColor(this.grid[ty][tx]), 15);
+                    this.fx.showText(this.ox+tx*this.size+32, this.oy+ty*this.size+32, `+${pts}`);
+                    this.anim=true; setTimeout(() => this.gravity(), 200);
+                }
+            }
+            this.drag = null;
+        }
+    }
+    gravity() {
+        for(let x=0; x<this.cols; x++) {
+            let wy=this.rows-1;
+            for(let y=this.rows-1; y>=0; y--) if(this.grid[y][x]!==-1) { if(wy!==y) { this.grid[wy][x]=this.grid[y][x]; this.grid[y][x]=-1; } wy--; }
+            for(let y=wy; y>=0; y--) this.grid[y][x] = Math.floor(Math.random()*5);
+        } setTimeout(() => { this.anim=false; }, 200);
+    }
+    draw() {
+        this.ctx.fillStyle='#222'; this.ctx.fillRect(this.ox-5,this.oy-5,this.cols*this.size+10,this.rows*this.size+10);
+        for(let y=0;y<this.rows;y++) for(let x=0;x<this.cols;x++) {
+            const val=this.grid[y][x];
+            if(val!==-1 && !(this.drag && this.drag.gx===x && this.drag.gy===y)) {
+                Graphics.drawGem(this.ctx, this.ox+x*this.size, this.oy+y*this.size, this.size, this.getColor(val));
+                this.ctx.fillStyle='#fff'; this.ctx.font='20px Arial'; this.ctx.textAlign='center'; this.ctx.fillText(val+1, this.ox+x*this.size+32, this.oy+y*this.size+40);
+            }
+        }
+        if(this.drag && window.gameManager.input.mouse.down) {
+            const mx=window.gameManager.input.mouse.x, my=window.gameManager.input.mouse.y;
+            Graphics.drawGem(this.ctx, mx-this.size/2, my-this.size/2, this.size, this.getColor(this.drag.val));
+        }
+    }
+}
+
+class Match3Game {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; 
+        this.cols=8; this.rows=8; this.size=50; 
+        this.ox=(w-this.cols*this.size)/2; this.oy=100;
+        this.grid=[]; this.state='IDLE'; this.sel=null;
+        for(let y=0;y<this.rows;y++) { const r=[]; for(let x=0;x<this.cols;x++) r.push(Math.floor(Math.random()*6)); this.grid.push(r); }
+        this.checkMatches();
+    }
+    getColor(v) { return Graphics.colorList[v]; }
+    update(dt, inp) {
+        if(this.state !== 'IDLE') return; const click = inp.getClick();
+        if(click && click.type === 'left') {
+            const gx=Math.floor((click.x-this.ox)/this.size), gy=Math.floor((click.y-this.oy)/this.size);
+            if(gx>=0&&gx<this.cols&&gy>=0&&gy<this.rows) {
+                if(!this.sel) this.sel={x:gx,y:gy};
+                else { if(Math.abs(gx-this.sel.x)+Math.abs(gy-this.sel.y)===1) this.swap(this.sel, {x:gx,y:gy}); this.sel=null; }
+            } else this.sel=null;
+        }
+    }
+    swap(p1, p2) {
+        this.state='SWAP'; let t=this.grid[p1.y][p1.x]; this.grid[p1.y][p1.x]=this.grid[p2.y][p2.x]; this.grid[p2.y][p2.x]=t;
+        setTimeout(() => {
+            if(!this.checkMatches()) { t=this.grid[p1.y][p1.x]; this.grid[p1.y][p1.x]=this.grid[p2.y][p2.x]; this.grid[p2.y][p2.x]=t; }
+            this.state='IDLE';
+        }, 200);
+    }
+    checkMatches() {
+        let m=new Set();
+        for(let y=0;y<this.rows;y++) for(let x=0;x<this.cols-2;x++) { let c=this.grid[y][x]; if(c===this.grid[y][x+1] && c===this.grid[y][x+2]) { m.add(`${x},${y}`); m.add(`${x+1},${y}`); m.add(`${x+2},${y}`); } }
+        for(let x=0;x<this.cols;x++) for(let y=0;y<this.rows-2;y++) { let c=this.grid[y][x]; if(c===this.grid[y+1][x] && c===this.grid[y+2][x]) { m.add(`${x},${y}`); m.add(`${x},${y+1}`); m.add(`${x},${y+2}`); } }
+        if(m.size>0) {
+            let pts=m.size*10; m.forEach(k=>{ const [x,y]=k.split(',').map(Number); this.fx.explode(this.ox+x*this.size+25,this.oy+y*this.size+25,this.getColor(this.grid[y][x]),5); this.grid[y][x]=-1; });
+            this.fx.showText(this.w/2,this.h/2,`+${pts}`); this.score+=pts; this.gravity(); return true;
+        } return false;
+    }
+    gravity() {
+        for(let x=0;x<this.cols;x++) {
+            let k=this.rows-1; for(let y=this.rows-1;y>=0;y--) if(this.grid[y][x]!==-1) { this.grid[k][x]=this.grid[y][x]; if(k!==y) this.grid[y][x]=-1; k--; }
+            for(let y=k;y>=0;y--) this.grid[y][x]=Math.floor(Math.random()*6);
+        } setTimeout(()=>this.checkMatches(),200);
+    }
+    draw() {
+        this.ctx.fillStyle='#111'; this.ctx.fillRect(this.ox-5,this.oy-5,this.cols*this.size+10,this.rows*this.size+10);
+        for(let y=0;y<this.rows;y++) for(let x=0;x<this.cols;x++) if(this.grid[y][x]!==-1) Graphics.drawGem(this.ctx,this.ox+x*this.size,this.oy+y*this.size,this.size,this.getColor(this.grid[y][x]));
+        if(this.sel) { this.ctx.strokeStyle='#fff'; this.ctx.lineWidth=4; this.ctx.strokeRect(this.ox+this.sel.x*this.size,this.oy+this.sel.y*this.size,this.size,this.size); }
+    }
+}
+
+class SimonGame {
+    constructor(ctx, w, h, fx) {
+        this.ctx=ctx; this.w=w; this.h=h; this.fx=fx; this.score=0; this.gameOver=false;
+        this.sequence=[]; this.playerStep=0; this.state='IDLE';
+        this.btns=[{x:w/2-110,y:h/2-110,c:'green',id:0},{x:w/2+10,y:h/2-110,c:'red',id:1},{x:w/2-110,y:h/2+10,c:'yellow',id:2},{x:w/2+10,y:h/2+10,c:'blue',id:3}];
+        this.lit=-1; setTimeout(()=>this.nextRound(),1000);
+    }
+    nextRound() { this.sequence.push(Math.floor(Math.random()*4)); this.playerStep=0; this.playSeq(); }
+    playSeq() { this.state='PLAY'; let i=0; const t=setInterval(()=>{ this.flash(this.sequence[i]); i++; if(i>=this.sequence.length) { clearInterval(t); this.state='INPUT'; } },800); }
+    flash(id) { this.lit=id; setTimeout(()=>this.lit=-1,400); }
+    update(dt, inp) {
+        if(this.state!=='INPUT') return; const c=inp.getClick();
+        if(c && c.type==='left') {
+            const h=this.btns.find(b=>c.x>b.x&&c.x<b.x+100&&c.y>b.y&&c.y<b.y+100);
+            if(h) {
+                this.flash(h.id);
+                if(h.id===this.sequence[this.playerStep]) { this.playerStep++; if(this.playerStep>=this.sequence.length) { this.score++; this.fx.showText(this.w/2,100,"BIEN!","#22c55e"); this.state='IDLE'; setTimeout(()=>this.nextRound(),1000); } }
+                else this.over=true;
+            }
+        }
+    }
+    draw() {
+        this.btns.forEach(b=>{
+            const l=this.lit===b.id; this.ctx.fillStyle=l?'#fff':Graphics.colors[b.c].inner;
+            this.ctx.fillRect(b.x,b.y,100,100); this.ctx.lineWidth=4; this.ctx.strokeStyle=Graphics.colors[b.c].outer; this.ctx.strokeRect(b.x,b.y,100,100);
+            if(l) { this.ctx.save(); this.ctx.shadowColor=Graphics.colors[b.c].inner; this.ctx.shadowBlur=30; this.ctx.fillStyle='#fff'; this.ctx.fillRect(b.x,b.y,100,100); this.ctx.restore(); }
+        });
+        this.ctx.fillStyle='#fff'; this.ctx.font='20px Arial'; this.ctx.textAlign='center';
+        if(this.state==='PLAY') this.ctx.fillText("¡ATENTO!",this.w/2,100); else if(this.state==='INPUT') this.ctx.fillText("TU TURNO",this.w/2,100);
+    }
+}
+
+class GameManager {
+    constructor() {
+        this.cvs = document.getElementById('gameCanvas'); this.ctx = this.cvs.getContext('2d');
+        this.input = new InputHandler(); this.fx = new Effects(); this.curr = null; this.lastT = 0;
+        
+        this.ui = {
+            menu: document.getElementById('main-menu'),
+            list: document.getElementById('menu-list'),
+            score: document.getElementById('score-display'),
+            hiscore: document.getElementById('hiscore-display'),
+            areaCtrl: document.getElementById('controls-area'),
+            exit: document.getElementById('exit-btn'),
+            btnFlag: document.getElementById('btn-flag')
+        };
+        
+        window.gameManager = this;
+        this.loadScores();
+        requestAnimationFrame(t => this.loop(t));
+    }
+
+    loadScores() { this.hi = JSON.parse(localStorage.getItem('pz_scores')) || {}; this.renderMenu(); }
+    saveScore(id, s) { if(!this.hi[id] || s > this.hi[id]) { this.hi[id] = s; localStorage.setItem('pz_scores', JSON.stringify(this.hi)); return true; } return false; }
+
+    renderMenu() {
+        this.ui.list.innerHTML = '';
+        const games = [
+            {id:'TETRIS', n:'TETRIS'}, {id:'COLUMNS', n:'COLUMNS'}, 
+            {id:'MINES', n:'MINAS'}, {id:'BOBBLE', n:'BOBBLE'},
+            {id:'MERGE', n:'MERGE'}, {id:'MATCH3', n:'BEJEWELED'},
+            {id:'SIMON', n:'SIMON'}, {id:'MEMORY', n:'PAREJAS'}
+        ];
+        games.forEach(g => {
+            const d = document.createElement('div'); d.className='menu-card';
+            d.innerHTML = `<span class="card-name">${g.n}</span><span class="card-score">HI: ${this.hi[g.id]||0}</span>`;
+            d.onclick = () => this.start(g.id);
+            this.ui.list.appendChild(d);
+        });
+    }
+
+    toggleFlagMode() { 
+        const s = this.input.toggleFlagMode(); 
+        this.ui.btnFlag.innerText = s ? "MODO: BANDERA" : "MODO: CAVAR";
+        this.ui.btnFlag.classList.toggle('active-mode', s);
+    }
+
+    start(type) {
+        this.ui.menu.classList.add('hidden');
+        this.ui.exit.classList.remove('hidden');
+        this.input.flagMode = false;
+        if(this.ui.btnFlag) { this.ui.btnFlag.innerText="MODO: CAVAR"; this.ui.btnFlag.classList.remove('active-mode'); }
+
+        this.currType = type;
+        this.ctx.clearRect(0,0,this.cvs.width,this.cvs.height);
+        this.ui.score.innerText = "0";
+        this.ui.hiscore.innerText = this.hi[type] || 0;
+
+        // Gestión de paneles de control
+        document.querySelectorAll('.ctrl-layout').forEach(el => el.classList.remove('active'));
+        
+        if(['TETRIS', 'COLUMNS'].includes(type)) document.getElementById('ctrl-pad').classList.add('active');
+        else if (type === 'BOBBLE') document.getElementById('ctrl-onebtn').classList.add('active');
+        else if (type === 'MINES') document.getElementById('ctrl-mines').classList.add('active');
+        else document.getElementById('ctrl-touch').classList.add('active');
+
+        switch(type) {
+            case 'TETRIS': this.curr = new TetrisGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'COLUMNS': this.curr = new ColumnsGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'MINES': this.curr = new MinesweeperGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'BOBBLE': this.curr = new BobbleGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'MEMORY': this.curr = new MemoryGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'MERGE': this.curr = new MergeGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'MATCH3': this.curr = new Match3Game(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+            case 'SIMON': this.curr = new SimonGame(this.ctx, this.cvs.width, this.cvs.height, this.fx); break;
+        }
+    }
+
+    toMenu() {
+        this.curr = null;
+        this.ui.menu.classList.remove('hidden');
+        this.ui.exit.classList.add('hidden');
+        this.renderMenu();
+        this.ctx.clearRect(0,0,this.cvs.width,this.cvs.height);
+    }
+
+    loop(t) {
+        const dt = t - this.lastT; this.lastT = t;
+        if (this.curr) {
+            this.ctx.clearRect(0, 0, this.cvs.width, this.cvs.height);
+            this.curr.update(dt, this.input);
+            this.fx.update();
+            this.curr.draw();
+            this.fx.draw(this.ctx);
+            this.ui.score.innerText = this.curr.score;
+            
+            if(this.curr.score > (this.hi[this.currType]||0)) this.ui.hiscore.innerText = this.curr.score;
+
+            if(this.curr.over) {
+                const rec = this.saveScore(this.currType, this.curr.score);
+                this.ctx.fillStyle='rgba(0,0,0,0.85)'; this.ctx.fillRect(0,0,this.cvs.width,this.cvs.height);
+                this.ctx.textAlign='center'; this.ctx.fillStyle='#ef4444'; 
+                this.ctx.font='40px "Press Start 2P"'; this.ctx.fillText("GAME OVER", this.cvs.width/2, this.cvs.height/2-20);
+                this.ctx.fillStyle='#fff'; this.ctx.font='20px "Press Start 2P"'; this.ctx.fillText(`SCORE: ${this.curr.score}`, this.cvs.width/2, this.cvs.height/2+30);
+                if(rec) { this.ctx.fillStyle='#facc15'; this.ctx.fillText("¡NUEVO RECORD!", this.cvs.width/2, this.cvs.height/2+70); }
+            }
+        }
+        requestAnimationFrame(t => this.loop(t));
+    }
+}
+
+const gameManager = new GameManager();
+</script>
+</body>
+</html>
