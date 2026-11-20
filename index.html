@@ -9,7 +9,7 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts Inter -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -40,20 +40,67 @@
   </script>
 
   <style>
-    /* Gradient animated glowing effects */
+    /* Animated Floating Glowing Blobs */
+    @keyframes float-1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(60px, -50px) scale(1.15); }
+      66% { transform: translate(-40px, 35px) scale(0.9); }
+    }
+    @keyframes float-2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(-70px, 60px) scale(1.2); }
+      66% { transform: translate(50px, -40px) scale(0.85); }
+    }
+    @keyframes float-3 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(50px, 40px) scale(0.95); }
+      66% { transform: translate(-60px, -50px) scale(1.12); }
+    }
+    .animate-float-1 { animation: float-1 20s ease-in-out infinite; }
+    .animate-float-2 { animation: float-2 26s ease-in-out infinite; }
+    .animate-float-3 { animation: float-3 22s ease-in-out infinite; }
+
+    /* Subtle Animated Grid Background */
+    .bg-grid-pattern {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 20%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 20%, transparent 80%);
+    }
+
+    /* Glow Card with Dynamic Cursor Spotlight */
     .glow-card {
       position: relative;
-      background: rgba(30, 41, 59, 0.7);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+                  border-color 0.3s ease, 
+                  box-shadow 0.3s ease;
+      overflow: hidden;
+    }
+    .glow-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(350px circle at var(--mouse-x, -500px) var(--mouse-y, -500px), rgba(99, 102, 241, 0.18), transparent 65%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s ease;
     }
     .glow-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(99, 102, 241, 0.4);
-      box-shadow: 0 20px 35px -10px rgba(99, 102, 241, 0.15);
+      transform: translateY(-5px);
+      border-color: rgba(129, 140, 248, 0.45);
+      box-shadow: 0 20px 40px -12px rgba(99, 102, 241, 0.22);
     }
+    .glow-card:hover::before {
+      opacity: 1;
+    }
+
     .badge {
       font-size: 0.75rem;
       font-weight: 600;
@@ -63,17 +110,24 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
 
-  <!-- Background decorative light gradients -->
-  <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-tr from-indigo-600/20 via-purple-600/15 to-emerald-500/10 blur-[130px] rounded-full"></div>
-    <div class="absolute bottom-10 right-0 w-[500px] h-[400px] bg-indigo-900/10 blur-[150px] rounded-full"></div>
-    <div class="absolute top-1/2 left-0 w-[400px] h-[400px] bg-blue-900/10 blur-[140px] rounded-full"></div>
+  <!-- Interactive Particles Canvas Layer -->
+  <canvas id="bg-canvas" class="fixed inset-0 pointer-events-none -z-10 w-full h-full"></canvas>
+
+  <!-- Animated Glowing Background Blobs -->
+  <div class="fixed inset-0 pointer-events-none -z-20 overflow-hidden">
+    <!-- Subtle technical grid -->
+    <div class="absolute inset-0 bg-grid-pattern"></div>
+    
+    <!-- Floating color orbs -->
+    <div class="absolute -top-32 left-1/3 w-[650px] h-[450px] bg-gradient-to-tr from-indigo-600/25 via-purple-600/20 to-pink-500/10 blur-[130px] rounded-full animate-float-1"></div>
+    <div class="absolute top-1/2 -right-20 w-[550px] h-[500px] bg-gradient-to-bl from-blue-600/20 via-cyan-500/15 to-emerald-500/15 blur-[140px] rounded-full animate-float-2"></div>
+    <div class="absolute -bottom-20 left-10 w-[600px] h-[450px] bg-gradient-to-tr from-emerald-600/15 via-indigo-600/15 to-purple-800/15 blur-[150px] rounded-full animate-float-3"></div>
   </div>
 
   <!-- Humorous Disclaimer Top Banner -->
   <div class="bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 border-b border-amber-500/20 px-4 py-3 text-center text-sm text-amber-200">
     <div class="max-w-4xl mx-auto flex items-center justify-center gap-2">
-      <span class="text-lg">⚠️</span>
+      <span class="text-lg animate-bounce">⚠️</span>
       <p>
         <span class="font-bold text-amber-300">Aviso a navegantes:</span> 
         Esta es la guarida de utilidades y proyectos personales de <strong>Jose Manuel (Taos)</strong>. 
@@ -86,14 +140,17 @@
   <header class="max-w-6xl w-full mx-auto px-6 pt-12 pb-8">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
       <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-[2px] shadow-lg shadow-indigo-500/20">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-[2px] shadow-lg shadow-indigo-500/25">
           <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-2xl font-black text-indigo-400 font-mono">
             T
           </div>
         </div>
         <div>
           <div class="flex items-center gap-3">
-            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white">Taos Personal Hub</h1>
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+              Taos Personal Hub
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="Sistema activo"></span>
+            </h1>
             <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Monorepo</span>
           </div>
           <p class="text-slate-400 text-sm mt-0.5">Acceso directo a utilidades, guías familiares, eventos y herramientas privadas.</p>
@@ -102,7 +159,7 @@
 
       <div class="flex items-center gap-3 text-xs text-slate-400">
         <a href="https://github.com/JoseMHR" target="_blank" rel="noopener noreferrer" 
-           class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
+           class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition">
           <i data-lucide="github" class="w-4 h-4"></i>
           <span>GitHub @JoseMHR</span>
         </a>
@@ -114,16 +171,16 @@
       <button onclick="filterProjects('all')" class="filter-btn active px-3.5 py-1.5 rounded-xl text-xs font-medium bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 transition">
         Todos (5)
       </button>
-      <button onclick="filterProjects('eventos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+      <button onclick="filterProjects('eventos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
         Eventos
       </button>
-      <button onclick="filterProjects('viajes')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+      <button onclick="filterProjects('viajes')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
         Viajes
       </button>
-      <button onclick="filterProjects('salud')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+      <button onclick="filterProjects('salud')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
         Herramientas
       </button>
-      <button onclick="filterProjects('juegos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+      <button onclick="filterProjects('juegos')" class="filter-btn px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
         Juegos
       </button>
     </div>
@@ -292,7 +349,7 @@
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
+  <footer class="border-t border-slate-900 bg-slate-950/80 backdrop-blur-md py-8 px-6 mt-12 text-center text-xs text-slate-500">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <p>© <span id="current-year">2026</span> Jose Manuel Heredia (Taos). Hecho con fines personales y familiares.</p>
       <div class="flex items-center gap-4">
@@ -306,24 +363,24 @@
   </footer>
 
   <script>
-    // Initialize Lucide icons
+    // 1. Initialize Lucide icons
     lucide.createIcons();
 
-    // Dynamic Year
+    // 2. Dynamic Year
     document.getElementById('current-year').textContent = new Date().getFullYear();
 
-    // Category Filtering
+    // 3. Category Filtering
     function filterProjects(category) {
       const cards = document.querySelectorAll('.project-card');
       const buttons = document.querySelectorAll('.filter-btn');
 
       buttons.forEach(btn => {
         btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-indigo-600/30');
-        btn.classList.add('bg-slate-900', 'border', 'border-slate-800', 'text-slate-300');
+        btn.classList.add('bg-slate-900/80', 'border', 'border-slate-800', 'text-slate-300');
       });
 
       // Highlight active button
-      event.target.classList.remove('bg-slate-900', 'border', 'border-slate-800', 'text-slate-300');
+      event.target.classList.remove('bg-slate-900/80', 'border', 'border-slate-800', 'text-slate-300');
       event.target.classList.add('bg-indigo-600', 'text-white', 'shadow-indigo-600/30');
 
       cards.forEach(card => {
@@ -334,6 +391,115 @@
         }
       });
     }
+
+    // 4. Dynamic Cursor Spotlight on Cards
+    document.querySelectorAll('.glow-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        card.style.setProperty('--mouse-x', `${x}px`);
+        card.style.setProperty('--mouse-y', `${y}px`);
+      });
+    });
+
+    // 5. Interactive Particle & Star Dust Canvas Animation
+    (function initParticleCanvas() {
+      const canvas = document.getElementById('bg-canvas');
+      const ctx = canvas.getContext('2d');
+      let particles = [];
+      let width, height;
+      let mouseX = -1000, mouseY = -1000;
+
+      function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      window.addEventListener('mousemove', e => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+
+      window.addEventListener('mouseleave', () => {
+        mouseX = -1000;
+        mouseY = -1000;
+      });
+
+      const particleCount = Math.min(Math.floor(width / 22), 65);
+      const colors = [
+        'rgba(99, 102, 241, 0.45)', // Indigo
+        'rgba(168, 85, 247, 0.4)',  // Purple
+        'rgba(56, 189, 248, 0.4)',  // Sky
+        'rgba(52, 211, 153, 0.35)'  // Emerald
+      ];
+
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          radius: Math.random() * 1.8 + 0.8,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 0.45,
+          vy: (Math.random() - 0.5) * 0.45,
+          baseRadius: Math.random() * 1.8 + 0.8
+        });
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, width, height);
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+
+          if (p.x < 0) p.x = width;
+          if (p.x > width) p.x = 0;
+          if (p.y < 0) p.y = height;
+          if (p.y > height) p.y = 0;
+
+          // Gentle mouse reaction
+          const dx = mouseX - p.x;
+          const dy = mouseY - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            const force = (120 - dist) / 120;
+            p.x -= (dx / dist) * force * 1.5;
+            p.y -= (dy / dist) * force * 1.5;
+          }
+
+          // Draw particle
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+
+          // Connect nearby particles with subtle faint lines
+          for (let j = i + 1; j < particles.length; j++) {
+            const p2 = particles[j];
+            const djx = p.x - p2.x;
+            const djy = p.y - p2.y;
+            const d = Math.sqrt(djx * djx + djy * djy);
+
+            if (d < 110) {
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.strokeStyle = `rgba(129, 140, 248, ${0.15 * (1 - d / 110)})`;
+              ctx.lineWidth = 0.7;
+              ctx.stroke();
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+    })();
   </script>
 </body>
 </html>
