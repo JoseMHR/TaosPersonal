@@ -29,4 +29,11 @@ Cada carpeta dentro de este repositorio representa una web o aplicación indepen
 
 ---
 
+## 🌐 Ecosistema de Proyectos
+- 💼 **[Portfolio Profesional & CV](https://josemhr.github.io/JoseMHR/)** - Perfil de Ingeniería Backend (+18 años), Arquitectura Hexagonal y Microservicios.
+- 🎮 **[Taos Game Maker](https://josemhr.github.io/TaosGameMaker/)** - Motor y framework data-driven para RPGs tácticos en Godot 4.3 + Web Studio.
+- 🏛️ **[Taos Legacy Games](https://josemhr.github.io/TaosLegacyGames/)** - Archivo histórico y cápsula del tiempo (2014–2016) de mis primeros experimentos de desarrollo de videojuegos.
+
+---
+
 Desarrollado con ❤️ por [Jose Manuel Heredia (Taos)](https://github.com/JoseMHR).

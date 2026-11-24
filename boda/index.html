@@ -88,6 +88,12 @@
 </head>
 <body class="min-h-screen flex flex-col justify-center items-center p-2 sm:p-4">
 
+    <div class="w-full max-w-4xl flex justify-start mb-2 px-2">
+        <a href="../index.html" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur shadow-sm text-xs font-semibold text-gray-700 hover:text-blue-600 hover:bg-white border border-gray-200 transition">
+            ← Volver a Taos Personal Hub
+        </a>
+    </div>
+
     <div id="app-content" class="container-card w-full max-w-4xl text-center">
 
         <div id="welcome-screen" class="section active-section">
@@ -103,15 +109,22 @@
             <p class="text-lg text-gray-600 mb-1">Celebración de mañana</p>
             <p class="text-md text-gray-500 italic mb-8">(Consultadnos para lugar y hora exacta)</p>
 
-            <div class="text-center mt-8">
+            <div class="text-center mt-8 flex flex-wrap justify-center gap-4">
                 <a href="https://docs.google.com/forms/d/e/1FAIpQLSd6a3smmYi7etG4jb_AVyI86lNF73TMx_lqRMQocsJpHt3Akg/viewform?usp=sf_link" target="_blank" rel="noopener noreferrer" class="btn-primary">
                       ¡Confirmar mi asistencia!
                  </a>
+                 <button onclick="showSection('main-info-screen')" class="btn-primary bg-indigo-600 hover:bg-indigo-700 cursor-pointer">
+                      Ver Detalles y Fiesta 🎉
+                 </button>
             </div>
-            <!-- <button onclick="showSection('main-info-screen')" class="btn-primary">Descubre nuestra boda</button> -->
         </div>
 
         <div id="main-info-screen" class="section hidden">
+            <div class="text-left mb-4">
+                <button onclick="showSection('welcome-screen')" class="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer">
+                    ← Volver a la Portada
+                </button>
+            </div>
             <h1 class="text-3xl sm:text-4xl font-extrabold text-gradient mb-8">Nuestra Boda</h1>
 
             <nav class="mb-8 border-b-2 border-gray-200">
