@@ -36,4 +36,9 @@ Cada carpeta dentro de este repositorio representa una web o aplicación indepen
 
 ---
 
+## 🌐 Web Publicada (Hub Personal)
+👉 **[https://josemhr.github.io/TaosPersonal/](https://josemhr.github.io/TaosPersonal/)**
+
+---
+
 Desarrollado con ❤️ por [Jose Manuel Heredia (Taos)](https://github.com/JoseMHR).
